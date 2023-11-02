@@ -3,8 +3,11 @@
 Created on Tue Oct 31 16:51:34 2023
 
 @author: Tyufik
-@author: Larry
 """
+
+import numpy as np
+import pandas as pd
+
 from datetime import datetime
 import re
 import time
@@ -20,6 +23,8 @@ driver = webdriver.Chrome(options=options)
 
 import requests
 from bs4 import BeautifulSoup as bs
+
+nt_id=3186
 #%%
 def get_NT_match_IDs(NT_ID, seasons):
     list_of_match_ids = []
@@ -38,7 +43,7 @@ def get_NT_match_IDs(NT_ID, seasons):
     return list_of_match_ids
 
 
-nt_match_ids=get_NT_match_IDs(3001, [85, 84])
+nt_match_ids=get_NT_match_IDs(nt_id, [85, 84])
 
 #%%
 import math
@@ -46,7 +51,135 @@ def drop_ts(G4):
     ts_new=-0.0046*(G4-5)^2+(G4-5)*(0.0932+0.0278*math.tanh((G4-5-4.65)/0.2))
     return(ts_new)
 
+def ts_data_import(nt_id=3001):
+    data=[]
+    f=open(str(nt_id)+'_ts_data.txt',mode='r')
+    while(1):
+        L=f.readline()
+        #print(L)
+        if L=='EOF' or len(L)==0:
+            break
+        Llist=L.split()
+        Date=datetime.strptime(Llist[0],'%m/%d/%Y')
+        ts_found=0
+        tc_found=0
+        
+        for l in Llist:
+            if l.isdigit() and ts_found==0:
+                ts_found=1
+                ts=l
+            elif l.isdigit() and tc_found==0:
+                tc_found=1
+                tc=l
+            elif l.isdigit():
+                print('what is this number '+l+'?')
+        if ts_found and tc_found:
+            data.append([Date,ts,tc])
+        elif ts_found and not tc_found:
+            data.append([Date,ts,None])
+        elif not ts_found and not tc_found:
+            data.append([Date,None,None])
+    data=pd.DataFrame(data)
+    data.columns=['datetime','team spirit','confidence']
+    return data
 
+ts_data=ts_data_import(nt_id=3001)
+
+def attitude_guess(ts_data,match_datetimes):
+    ts_locat=0
+    team_spirits=[]
+    team_spirits_next=[]
+    match_attitudes=[]
+    for match_datetime in match_datetimes.values:
+        #find location in ts_list
+        try:
+            match_date=match_datetime.date()
+        except AttributeError:
+            md=pd.to_datetime(match_datetime)
+            match_date=md.date()
+
+        matched_date_rows=[]
+        while 1:
+            #find closest dates to match date
+            
+            ts_date=ts_data['datetime'][ts_locat].date()
+            
+            
+            if match_date==ts_date:
+                matched_date_rows.append(ts_locat)
+                
+            if ts_date<match_date:
+                print('md')
+                print(match_date)
+                print('ts')
+                print(ts_date)
+                print(matched_date_rows)
+                
+                if len(matched_date_rows)==2:
+                    ts=int(ts_data['team spirit'][matched_date_rows[1]])
+                    ts_next=int(ts_data['team spirit'][matched_date_rows[0]])
+                    team_spirits.append(ts)
+                    team_spirits_next.append(ts_next)
+                    if ts_next>ts and ts>4:
+                        match_attitudes.append(4/3)#PIC with ts about composed
+                    elif ts_next>1.2*ts and ts<5:
+                        match_attitudes.append(4/3)#PIC with ts below calm 
+                    elif ts_next<0.66*ts:
+                        match_attitudes.append(1/2)#MOTS
+                    else:
+                        match_attitudes.append(1)
+                        
+
+                elif len(matched_date_rows)==1:
+                    ts=int(ts_data['team spirit'][matched_date_rows[0]])
+                    ts_next=int(ts_data['team spirit'][matched_date_rows[0]-1])
+                    ts_prev=int(ts_data['team spirit'][matched_date_rows[0]+1])
+                    if ts_next>ts and ts>4 or ts_next>1.2*ts and ts<5:
+                        match_attitudes.append(4/3)
+                        team_spirits.append(ts)
+                        team_spirits_next.append(ts_next)
+                        
+                    elif ts>ts_prev and ts_prev>4 or ts>1.2*ts_prev and ts_prev<5:
+                        match_attitudes.append(4/3)
+                        team_spirits.append(ts_prev)
+                        team_spirits_next.append(ts)
+                        
+                    elif ts_next<0.66*ts:
+                        match_attitudes.append(1/2)
+                        team_spirits.append(ts)
+                        team_spirits_next.append(ts_next)
+                        
+                    elif 0.66*ts_prev>ts:
+                        match_attitudes.append(1/2)
+                        team_spirits.append(ts_prev)
+                        team_spirits_next.append(ts)
+
+                    else:
+                        match_attitudes.append(1)
+                        team_spirits.append(ts)
+                        team_spirits_next.append(ts_next)                        
+                elif len(matched_date_rows)==0:         
+                    ts=int(ts_data['team spirit'][ts_locat])
+                    ts_next=int(ts_data['team spirit'][ts_locat-1]) 
+                    team_spirits.append(ts)
+                    team_spirits_next.append(ts_next)
+                    if ts_next>ts and ts>4:
+                        match_attitudes.append(4/3)#PIC with ts about composed
+                    elif ts_next>1.2*ts and ts<5:
+                        match_attitudes.append(4/3)#PIC with ts below calm 
+                    elif ts_next<0.66*ts:
+                        match_attitudes.append(1/2)#MOTS
+                    else:
+                        match_attitudes.append(1)               
+                    
+                
+
+
+                break
+            ts_locat=ts_locat+1
+    ts_array=pd.concat([pd.Series(match_datetimes),pd.Series(team_spirits),pd.Series(team_spirits_next),pd.Series(match_attitudes)],axis=1)
+    return ts_array
+            
 #%%
 
 def style_of_play_parser(sop):
@@ -79,43 +212,43 @@ def get_nt_match_ratings(nt_match_id,debug_on=0):
     #find 'average goals'
     cells_text=[cells[i].text for i in range(len(cells))]
     avggoal_index=cells_text.index('Average goals')
-    print('average goals at '+str(avggoal_index))
+    #print('average goals at '+str(avggoal_index))
     totalexp_index=cells_text.index('Total player experience')
     
     
     team_A = {
         'Team name': table_head[2].text,
-        'Midfield': float(cells[3].text.replace(',','.')),
-        'Right defence': float(cells[10].text.replace(',','.')),
-        'Central defence':float(cells[17].text.replace(',','.')),
-        'Left defence': float(cells[24].text.replace(',','.')),
-        'Right attack': float(cells[31].text.replace(',','.')),
-        'Central attack': float(cells[38].text.replace(',','.')),
-        'Left attack': float(cells[45].text.replace(',','.')),
-        'ISP defence': float(cells[52].text.replace(',','.')),
-        'ISP attack': float(cells[59].text.replace(',','.')),
-        'Tactic': cells[70].text,
-        'Tactic skill': cells[76].text,
-        'Total exp': float(cells[totalexp_index+3].text.replace(',','.')),
-        'Style of play': style_of_play_parser(cells[79].text),
-        'Average goals': float(cells[avggoal_index-1].text.replace(',','.'))
+        'Midfield': float(cells_text[3].replace(',','.')),
+        'Right defence': float(cells_text[10].replace(',','.')),
+        'Central defence':float(cells_text[17].replace(',','.')),
+        'Left defence': float(cells_text[24].replace(',','.')),
+        'Right attack': float(cells_text[31].replace(',','.')),
+        'Central attack': float(cells_text[38].replace(',','.')),
+        'Left attack': float(cells_text[45].replace(',','.')),
+        'ISP defence': float(cells_text[52].replace(',','.')),
+        'ISP attack': float(cells_text[59].replace(',','.')),
+        'Tactic': cells_text[70],
+        'Tactic skill': cells_text[76],
+        'Total exp': float(cells_text[totalexp_index+3].replace(',','.')),
+        'Style of play': style_of_play_parser(cells_text[79]),
+        'Average goals': float(cells_text[avggoal_index-1].replace(',','.'))
     }
     team_B = {
         'Team name': table_head[4].text,
-        'Midfield': float(cells[6].text.replace(',','.')),
-        'Right defence': float(cells[13].text.replace(',','.')),
-        'Central defence':float(cells[20].text.replace(',','.')),
-        'Left defence': float(cells[27].text.replace(',','.')),
-        'Right attack': float(cells[34].text.replace(',','.')),
-        'Central attack': float(cells[41].text.replace(',','.')),
-        'Left attack': float(cells[48].text.replace(',','.')),
-        'ISP defence': float(cells[55].text.replace(',','.')),
-        'ISP attack': float(cells[62].text.replace(',','.')),
-        'Tactic': cells[72].text,
-        'Tactic skill': cells[78].text,
-        'Total exp': float(cells[totalexp_index+6].text.replace(',','.')),
-        'Style of play': style_of_play_parser(cells[81].text),
-        'Average goals': float(cells[avggoal_index+1].text.replace(',','.'))
+        'Midfield': float(cells_text[6].replace(',','.')),
+        'Right defence': float(cells_text[13].replace(',','.')),
+        'Central defence':float(cells_text[20].replace(',','.')),
+        'Left defence': float(cells_text[27].replace(',','.')),
+        'Right attack': float(cells_text[34].replace(',','.')),
+        'Central attack': float(cells_text[41].replace(',','.')),
+        'Left attack': float(cells_text[48].replace(',','.')),
+        'ISP defence': float(cells_text[55].replace(',','.')),
+        'ISP attack': float(cells_text[62].replace(',','.')),
+        'Tactic': cells_text[72],
+        'Tactic skill': cells_text[78],
+        'Total exp': float(cells_text[totalexp_index+6].replace(',','.')),
+        'Style of play': style_of_play_parser(cells_text[81]),
+        'Average goals': float(cells_text[avggoal_index+1].replace(',','.'))
     }
     if debug_on:
         for i in range(len(cells)):
@@ -148,7 +281,7 @@ for ntmid in nt_match_ids:
     match_list.append(match_data)
     
 #%%
-import pandas as pd
+
 home_ratings=pd.DataFrame(team_a_list)
 away_ratings=pd.DataFrame(team_b_list)
 oor_team=pd.unique(home_ratings['Team name'])[0]    
@@ -211,7 +344,64 @@ for r in overall_ratings_.index:
         overall_ratings.append(list(row))
     #if r==0: break
 
-overall_ratings_pd=pd.concat([pd.DataFrame(match_data),pd.DataFrame(overall_ratings)],axis=1)
+def add_(s):
+    return s+'_'
+
+overall_ratings_pd=pd.concat([pd.DataFrame(match_list),pd.DataFrame(overall_ratings)],axis=1)
+overall_ratings_pd.columns=overall_ratings_pd.columns[:2]\
+    .union(home_ratings.columns,sort=False).union(pd.Series(['HomeOrAway']),sort=False)\
+    .union(pd.Series(home_ratings.columns).apply(add_),sort=False).union(pd.Series(['HomeOrAway_']),sort=False)
+#import team spirits - currently manual
+
+match_datetimes=pd.Series(overall_ratings_pd['Match Datetime'])
+
+ts_array=attitude_guess(ts_data,match_datetimes)
+
+#now scale according to team spirit...
+ts_multipliers=[\
+    [10,122,142,162],\
+    [9,116,135,154,],\
+    [8,	110,	128,	146],\
+    [7,	104,	121,	138],\
+    [6,	98,	114,	130],\
+    [5,	92,	107,	122],\
+    [4,	87,	100,	113],\
+    [3,	81,	93,	105],\
+    [2,	75,	86,	97],\
+    [1,	63,	72,	81],\
+    [0,10,20,30]]
+import numpy as np
+ts_multipliers=np.array(ts_multipliers)
+
+scaled_midfields=[]
+for i in overall_ratings_pd.index:
+    ts=ts_array[0]
+    scaling=ts
+    scaled_midfields.append(overall_ratings_pd['Midfield'].loc[i]*scaling)
+
+    
+    
+"""
+Playing Normal&Away	100%
+Playing CA	93%
+Playing at home	119.892%
+Playing derby(away team)	111.493% •
+Playing PIC	83.945%
+Playing MOTS	111.49%
+"""
+
+"""
+Paradise on Earth!	122%	142%	162%
+walking on clouds	116%	135%	154%
+delirious	110%	128%	146%
+satisfied	104%	121%	138%
+content	98%	114%	130%
+calm	92%	107%	122%
+composed	87%	100%	113%
+irritated	81%	93%	105%
+furious	75%	86%	97%
+murderous	63%	72%	81%
+"""
 
 
 

@@ -1,0 +1,101 @@
+11/2/2023	5 calm	5 strong
+11/1/2023	0 like the Cold War	
+10/30/2023	2 furious	
+10/22/2023	3 irritated	
+10/20/2023	2 furious	
+10/16/2023	1 murderous	
+10/13/2023	0 like the Cold War	
+10/9/2023	4 composed	
+9/25/2023	3 irritated	4 decent
+9/23/2023	2 furious	
+9/22/2023	4 composed	
+9/18/2023		4 decent
+9/16/2023	3 irritated	
+9/15/2023	4 composed	
+9/13/2023	9 walking on clouds	
+9/8/2023 	10 paradise on earth!	
+9/8/2023	9 walking on clouds	
+9/5/2023 	10 paradise on earth!	3 poor
+9/4/2023	7 satisfied	
+9/2/2023 	8 delirious	
+9/1/2023	6 content	5 strong
+8/30/2023	8 delirious	
+8/27/2023	9 walking on clouds	
+8/25/2023 	10 paradise on earth!	
+8/25/2023	8 delirious	
+8/21/2023	9 walking on clouds	
+8/19/2023 	10 paradise on earth!	
+8/18/2023	8 delirious	
+8/15/2023 	9 walking on clouds	5 strong
+8/11/2023 	7 satisfied	6 wonderful
+8/7/2023	5 calm	
+8/6/2023	6 content	5 strong
+8/5/2023 	6 content	
+8/4/2023	4 composed	
+8/2/2023	2 furious	
+8/1/2023	1 murderous		
+7/29/2023 	0 like the Cold War	
+7/28/2023 	4 composed	5 strong
+7/28/2023	8 delirious	
+7/24/2023	9 walking on clouds	
+7/22/2023 	10 paradise on earth!	4 decent
+7/21/2023	7 satisfied	
+7/14/2023	8 delirious	
+7/13/2023	9 walking on clouds	
+7/10/2023	10 paradise on earth!	5 strong
+7/7/2023	8 delirious	
+7/6/2023	9 walking on clouds	6 wonderful
+7/1/2023 	10 paradise on earth!	6 wonderful
+6/30/2023	8 delirious	
+6/26/2023	9 walking on clouds	
+6/24/2023 	10 paradise on earth!	
+6/19/2023	8 delirious	
+6/17/2023 	9 walking on clouds	
+6/12/2023		5 strong
+6/10/2023 		6 wonderful
+6/9/2023	7 satisfied	
+6/6/2023 	8 delirious	4 decent
+6/5/2023	6 content	5 strong
+6/3/2023 	6 content	
+6/2/2023	5 calm	
+5/31/2023	0 like the Cold War	
+5/30/2023	1 murderous	
+5/29/2023	0 like the Cold War	
+5/28/2023	3 irritated	
+5/26/2023	2 furious	
+5/22/2023	1 murderous	
+5/19/2023	0 like the Cold War	
+5/19/2023	3 irritated	
+5/13/2023 	2 furious	
+5/12/2023	4 composed	5 strong
+5/6/2023 	4 composed	5 strong
+5/5/2023	8 delirious	
+5/4/2023	9 walking on clouds	
+4/29/2023 	10 paradise on earth!	6 wonderful
+4/28/2023	8 delirious	
+4/24/2023	9 walking on clouds	
+4/22/2023 	10 paradise on earth!	5 strong
+4/17/2023	8 delirious	
+4/15/2023 		6 wonderful
+4/14/2023	9 walking on clouds	
+4/8/2023 	10 paradise on earth!	5 strong
+4/7/2023	10 paradise on earth!	6 wonderful
+4/3/2023	9 walking on clouds	
+4/1/2023 	7 satisfied	
+3/28/2023 	8 delirious	5 strong
+3/25/2023 	6 content	4 decent
+3/24/2023	5 calm	5 strong
+3/22/2023	0 like the Cold War	
+3/20/2023	1 murderous	
+3/18/2023	0 like the Cold War	
+3/17/2023	1 murderous	
+3/13/2023	4 composed	4 decent
+2/28/2023	3 irritated	
+2/24/2023	2 furious	
+2/20/2023	1 murderous	
+2/17/2023	0 like the Cold War	
+2/17/2023	7 satisfied	
+2/13/2023	8 delirious	
+2/11/2023 		4 decent
+2/10/2023	9 walking on clouds	
+2/8/2023	10 paradise on earth!	5 strong
