@@ -29,10 +29,10 @@ from bs4 import BeautifulSoup as bs
 
 from github_upload import github_upload
 
-nt_id=3116
+nt_id=3172
 attitudes_override=1
 match_venue_forthem='A'
-import_from_remote=1
+import_from_remote=0
 
 
 
@@ -58,8 +58,10 @@ def get_NT_match_IDs(NT_ID, seasons):
 
     return list_of_match_ids
 
-
-nt_match_ids=get_NT_match_IDs(nt_id, [86, 85, 84])
+try:
+    nt_match_ids=get_NT_match_IDs(nt_id, [86, 85, 84])
+except:
+    print('no connection to site')
 
 #%% TS evolution
 import math
@@ -89,14 +91,14 @@ season_length=16*7
 def ts_reset_times(season_start_date):
     cc_reset=season_start_date+timedelta(days=16)
     quali_reset=cc_reset+timedelta(days=53)
-    wc_reset=quali_reset+timedelta(days=14)
+    wc_reset=cc_reset+timedelta(days=70)
     wcr2_reset=wc_reset+timedelta(days=63)
-    wcr3_reset=wcr2_reset+timedelta(days=21)
+    wcr3_reset=wcr2_reset+timedelta(days=28)
     wcr4_reset=wcr3_reset+timedelta(days=14)
     return cc_reset,quali_reset,wc_reset,wcr2_reset,wcr3_reset,wcr4_reset
 
 
-def ts_evolution(match_datetimes,match_type,ts_array,season_start_date,next_match_date=datetime.now().date(),debug_tsev=0):
+def ts_evolution(match_datetimes,match_type,ts_array,season_start_date,next_match_date=datetime.now(),debug_tsev=0):
 #%% 
     match_attitude=ts_array[2]
     ts_integer=ts_array[0]
@@ -106,6 +108,7 @@ def ts_evolution(match_datetimes,match_type,ts_array,season_start_date,next_matc
         match_type=overall_ratings_pd['Match Type']
         match_attitude=ts_array[2]
         season_start_date=season_start_date84
+        next_match_date=datetime.now()
         
     
 
@@ -188,7 +191,7 @@ def ts_evolution(match_datetimes,match_type,ts_array,season_start_date,next_matc
       
         #if curr_date==season_start_date+timedelta(days=224):
             #break
-        if curr_date>next_match_date:
+        if curr_date>next_match_date.date():
             print('reached present day')
             break               
 #%% 
@@ -267,6 +270,22 @@ def ts_data_import(nt_id=3001):
     """
     data=[]
     f=open(str(nt_id)+'_ts_data.txt',mode='r')
+    date_format_ts='month_first'
+    while(1):
+        L=f.readline()
+        if L=='EOF' or len(L)==0:
+            break
+        
+        numbers_inL=re.findall(r'\d+',L)
+        
+        Llist=L.split()
+        try:
+            Date=datetime.strptime(Llist[0],'%m/%d/%Y')
+        except ValueError:
+            Date=datetime.strptime(Llist[0],'%d/%m/%Y')
+            date_format_ts='day_first'
+            break
+    
     while(1):
         L=f.readline()
         #print(L)
@@ -276,10 +295,11 @@ def ts_data_import(nt_id=3001):
         numbers_inL=re.findall(r'\d+',L)
         
         Llist=L.split()
-        Date=datetime.strptime(Llist[0],'%m/%d/%Y')
-        ts_found=0
-        tc_found=0
-        
+        if date_format_ts=='month_first':
+            Date=datetime.strptime(Llist[0],'%m/%d/%Y')
+        elif date_format_ts=='day_first':
+            Date=datetime.strptime(Llist[0],'%d/%m/%Y')            
+        ts_found=0        
         if len(numbers_inL)==5:
             ts=numbers_inL[3]
             tc=numbers_inL[4]
@@ -300,7 +320,6 @@ def ts_data_import(nt_id=3001):
     last_ts=None
     last_tc=None
     for i in data.index[::-1]: 
-        
         if data['team spirit'].loc[i] is not None:
             last_ts=data['team spirit'].loc[i]
         else:
@@ -309,8 +328,7 @@ def ts_data_import(nt_id=3001):
         if data['confidence'].loc[i] is not None:
             last_tc=data['confidence'].loc[i]
         else:
-            data['confidence'].loc[i]=last_tc            
-            
+            data['confidence'].loc[i]=last_tc
     
     return data
 
@@ -329,9 +347,10 @@ def attitude_guess(ts_data,match_datetimes,current_ts=5):
     
     ts_data.columns=['datetime','team spirit','confidence']
     
-
+ 
     
     for enm,match_datetime in enumerate(match_datetimes.values):
+
         #find location in ts_list
         try:
             match_date=match_datetime.date()
@@ -342,22 +361,29 @@ def attitude_guess(ts_data,match_datetimes,current_ts=5):
         matched_date_rows=[]
         while 1:
             #find closest dates to match date
-            
-            ts_date=ts_data['datetime'][ts_locat].date()
-            
+            try:
+                ts_date=ts_data['datetime'][ts_locat].date()
+            except KeyError:
+                print(ts_data)
+                print(ts_locat)
+                print(match_date)
+                import bobex
             
             if match_date==ts_date:
                 matched_date_rows.append(ts_locat)
                 
             if ts_date<match_date:
+                print(ts_date)
+                print(match_date)
                 break
             else: 
                 ts_locat=ts_locat+1
         print(enm)   
-        print('md')
+        print('match date')
         print(match_date)
-        print('ts')
+        print('team spirit record date')
         print(ts_date)
+        print('number of matched rows:')
         print(matched_date_rows)
         
         
@@ -394,7 +420,7 @@ def attitude_guess(ts_data,match_datetimes,current_ts=5):
 
         elif len(matched_date_rows)==1:
             ts=int(ts_data['team spirit'][matched_date_rows[0]])
-            ts_next=int(ts_data['team spirit'][matched_date_rows[0]-1])
+            ts_next=int(ts_data['team spirit'][max(matched_date_rows[0]-1,0)])
             ts_prev=int(ts_data['team spirit'][matched_date_rows[0]+1])
             if ts_next>ts and ts>4 or ts_next>1.2*ts and ts<5:
                 match_attitudes.append(4/3)
@@ -439,9 +465,9 @@ def attitude_guess(ts_data,match_datetimes,current_ts=5):
                 team_spirits.append(ts)
                 team_spirits_next.append(np.NAN)
                 ts_next=np.NAN                       
-        print(ts)
-        print(ts_next)
-        print(len(match_attitudes))
+        print('previous ts '+str(ts))
+        print('next ts '+str(ts_next))
+        print('match '+str(len(match_attitudes)))
 
 
         """
@@ -521,7 +547,9 @@ def array_clean(ratings_array):
             elif C2[c]=='formidable\nformidable':
                 C2[c]=9                
             elif C2[c]=='excellent\nexcellent':
-                C2[c]=8                
+                C2[c]=8
+            elif C2[c]=='solid\nsolid':
+                C2[c]=7
             elif 'divine' in C2[c]:
                 divin=re.search(r'\d+', C2[c]+'0').group()
                 
@@ -565,6 +593,8 @@ def array_clean(ratings_array):
                 C4[c]=9
             elif C4[c]=='excellent\nexcellent':
                 C4[c]=8
+            elif C4[c]=='solid\nsolid':
+                C4[c]=7
             elif 'divine' in C4[c]:
                 divin=re.search(r'\d+', C4[c]+'0').group()
                 
@@ -594,10 +624,10 @@ def match_type_abbrev(mt):
         return 'WCQF'
     if 'Quarterfinals' in mt and 'World' not in mt:
         return 'CCQF'    
-    if 'Semifinals' in mt and 'World' in mt:
+    if 'Semi-finals' in mt and 'World' in mt:
         return 'WCSF'
-    if 'Semifinals' in mt and 'World' not in mt:
-        return 'CCSF'  
+    if 'Semi-finals' in mt and 'World' not in mt:
+        return 'CCSF'
     if ' Final ' in mt and 'World' in mt:
         return 'WCF'
     if ' Final ' in mt and 'World' not in mt:
@@ -633,6 +663,9 @@ def get_nt_match_ratings(nt_match_id,debug_on=0):
     
     #find 'average goals'
     cells_text=[cells[i].text for i in range(len(cells))]
+    if 'Average goals' not in cells_text:
+        print('possible WO, skipping')
+        return None,None,None
     avggoal_index=cells_text.index('Average goals')
     #print('average goals at '+str(avggoal_index))
     totalexp_index=cells_text.index('Total player experience')
@@ -680,7 +713,7 @@ def get_nt_match_ratings(nt_match_id,debug_on=0):
     for i in range(70, 120):
         match_text += (spans[i].text)
     
-    formations_text = re.findall(".-.-.", match_text)
+    formations_text = re.findall("[2-5]-[2-5]-[0-3]", match_text)
     home_team_formation = formations_text[0]
     away_team_formation = formations_text[1]
     
@@ -736,17 +769,18 @@ if import_from_remote==True:
     match_list=[]
     for ntmid in nt_match_ids:
         team_A, team_B,match_data = get_nt_match_ratings(ntmid)
-        team_a_list.append(team_A)
-        team_b_list.append(team_B)
-        match_list.append(match_data)
+        if team_A is not None:
+            team_a_list.append(team_A)
+            team_b_list.append(team_B)
+            match_list.append(match_data)
+        
     
     
     
     
-    
-    home_ratings=pd.DataFrame(team_a_list)
-    away_ratings=pd.DataFrame(team_b_list)
-    matches_pd=pd.DataFrame(match_list)
+    home_ratings=pd.DataFrame([a for a in team_a_list if a is not None])
+    away_ratings=pd.DataFrame([b for b in team_b_list if b is not None])
+    matches_pd=pd.DataFrame([m for m in match_list if m is not None])
     home_ratings.to_csv('home_ratings_backup.csv',index=False)
     away_ratings.to_csv('away_ratings_backup.csv',index=False)
     matches_pd.to_csv('matches_data_backup.csv',index=False)
@@ -950,6 +984,24 @@ if attitudes_override:
         attitudes.loc[attitudes.shape[0]-5]=4/3
         attitudes.loc[attitudes.shape[0]-7]=4/3
         attitudes.loc[attitudes.shape[0]-25]=1
+        
+    if nt_id==3023:
+        attitudes.loc[attitudes.shape[0]-8]=4/3
+        attitudes.loc[attitudes.shape[0]-7]=4/3
+        attitudes.loc[attitudes.shape[0]-5]=4/3
+        attitudes.loc[attitudes.shape[0]-29]=4/3
+    if nt_id==3222:
+        attitudes.loc[attitudes.shape[0]-48]=1        
+        attitudes.loc[attitudes.shape[0]-47]=4/3
+        attitudes.loc[attitudes.shape[0]-45]=4/3
+        attitudes.loc[attitudes.shape[0]-5]=4/3
+        attitudes.loc[attitudes.shape[0]-17]=4/3
+        
+    if nt_id==3084:
+        attitudes.loc[attitudes.shape[0]-12]=1/2        
+        attitudes.loc[attitudes.shape[0]-15]=1/2            
+        attitudes.loc[attitudes.shape[0]-18]=4/3
+          
 ts_array[2]=attitudes.round(decimals=1)
 ts_evol,ts_atmatch,ts_integer=ts_evolution(match_datetimes=overall_ratings_pd['Match Datetime'],\
                      match_type=overall_ratings_pd['Match Type'],\
@@ -1000,7 +1052,12 @@ for i in range(overall_ratings_pd.shape[0]):
 
 overall_ratings_pd['scaled_midfield']=S     
 ts_array[6]=S
-print(ts_array)
+
+team_spirit_array=ts_array.copy()
+team_spirit_array.columns=['Match Datetime','ts before','ts after',\
+                  'attitude','ts evol','scaled mid','mid','away scaled mid',\
+                      'location','match type','formation','tactic']
+print(team_spirit_array)
 
 if 'scaled midfield' not in overall_ratings_pd.columns:
     overall_ratings_pd.insert(3,'scaled midfield',S)
@@ -1009,6 +1066,7 @@ else:
 
 
 overall_ratings_pd.to_csv(str(nt_id)+'_ratings_data.csv')
+
 
 github_upload(str(nt_id)+'_ratings_data.csv')
 

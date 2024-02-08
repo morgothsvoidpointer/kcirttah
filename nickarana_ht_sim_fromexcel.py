@@ -16,7 +16,7 @@ import re
 
 from larry_ht_sim import Team,Match
 
-nt_id=3116
+nt_id=3172
 nt_id_eng=3019
 
 matches_since_season_start=3
