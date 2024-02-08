@@ -29,7 +29,8 @@ options.add_argument('--headless')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-dev-shm-usage')
 driver = webdriver.Chrome(options=options)
-
+#from webdriver_manager.chrome import ChromeDriverManager
+#driver = webdriver.Chrome(ChromeDriverManager().install())
 
 def ehffutbol_ts_tc(nt_id=3172):
     ts_array=[]
@@ -58,17 +59,27 @@ def ehffutbol_ts_tc(nt_id=3172):
         print(tstc)
         R=raw_tstc_output_process(tstc)
         rs_array=R
+    month_pos=-1
     while 1:
         #now click for past data
-        Mpress=Months[-1]
+        Mpress=Months[month_pos]
+        
+        print('NEW MONTH')
+        print(Mpress.text)
         if Mpress.text=='December':
             #change year
             curr_year_in_list=curr_year_in_list+1
             Ypress=Years[curr_year_in_list]
+            if str(Ypress.text)=='2022':
+                break
+            print('changing to year '+Ypress.text)
             Ypress.click()
         Mpress.click()
+        month_pos=month_pos-1
+        if month_pos==-12:
+            month_pos=0
         time.sleep(5)
-        print('NEW MONTH')
+        
         
         D=driver.find_elements(By.TAG_NAME,'option')
         Months=[]
@@ -89,6 +100,7 @@ def ehffutbol_ts_tc(nt_id=3172):
             print(tstc)
             R=raw_tstc_output_process(tstc)
             ts_array.extend(R)
+    ts_array=pd.DataFrame(ts_array).sort_values(by=0).drop_duplicates()
     return ts_array
 
 
