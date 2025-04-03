@@ -15,11 +15,31 @@ import numpy as np
 import re
 
 from larry_ht_sim import Team,Match
+ 
+#nt_id=3222
 
-nt_id=3172
-nt_id_eng=3019
+from ht_ratings_export import nt_id
 
-matches_since_season_start=3
+np.set_printoptions(threshold=100000)
+pd.option_context('display_max_rows',None,'display_max_columns',100)
+pd.options.display.max_colwidth=100
+nt_id_eng=3035
+
+mots_not_pic=0#set 1 to return results for MOTS and PIN
+#set 0 to return results for PIC and PIN
+WLD=2
+#2 to return win %'s
+#1 to return draw %'s
+#0 to return opposition win %'s
+
+if mots_not_pic:
+    pic_coeff=1.115
+    pic_flag='MOTS'
+else:
+    pic_coeff=0.0859
+    pic_flag='PIC'
+
+current_campaign_season_start=88
 
 filename='htme_sim.xlsx'
 excel=ExcelCompiler(os.getcwd()+'/'+filename)
@@ -97,6 +117,7 @@ def wdl_nicarana(ratings_home,\
     tactics_convert['Pressing']='Pressing'
     tactics_convert['Attack on wings']='Attack On Wings'
     tactics_convert['Attack in the Middle']='Attack In Middle'
+    tactics_convert['WO']='WO'
     
     metaratings_home[4]=tactics_convert[metaratings_home[4]]
     metaratings_away[4]=tactics_convert[metaratings_away[4]]
@@ -109,7 +130,6 @@ def wdl_nicarana(ratings_home,\
         excel.set_value('simulator!'+home_cells[i],metaratings_home[i])
     for i in range(len(metaratings_away)):
         excel.set_value('simulator!'+away_cells[i],metaratings_away[i])  
-
 
     home_cells=['J11','K11','L11',\
                 'I12','J12','K12','L12','M12',\
@@ -139,6 +159,8 @@ def wdl_nicarana(ratings_home,\
 
 
 def array_clean(ratings_array):
+    ratings_array=ratings_array[ratings_array['Tactic short']!='WO'].reset_index()
+    
     C1=ratings_array['Tactic'].tolist()
     C2=ratings_array['Tactic skill'].tolist()
     for c,i in enumerate(C1):
@@ -225,7 +247,7 @@ def ratings_array_rearrange(ratings_array,\
                             scale=0,\
                             historic_match_simulation=False):
 
-   #if simulating historic matches, the 'test_ratings' is just the 'ratings_array'
+   #if simulating historic matches, the '_test_ratings' is just the 'ratings_array'
    #with the two blocks of columns interchanged. 
     if historic_match_simulation:
         for col in ratings_array.columns:
@@ -263,24 +285,33 @@ def ratings_array_rearrange(ratings_array,\
             #print(i,j)
             row1=ratings_array.loc[i]
             row2=test_ratings.loc[j]
-
+            
+            if 'sc_ra' in ratings_array.columns:
+                att_lab_r='sc_ra'
+                att_lab_c='sc_ca'
+                att_lab_l='sc_la'
+            else:
+                att_lab_r='Right attack'
+                att_lab_c='Central attack'
+                att_lab_l='Left attack'
+            
             if scale==1 and not np.isnan(row1['scaled midfield']):#scaled for pin
-                ratings_home=row1[['Right attack', \
-                                   'Central attack',\
-                                   'Left attack',\
+                ratings_home=row1[[att_lab_r,\
+                                   att_lab_c,\
+                                   att_lab_l,\
                                    'scaled midfield',\
                                    'Right defence',\
                                    'Central defence',\
                                    'Left defence']].to_list()
             elif scale==2 and not np.isnan(row1['scaled midfield']):#scaled for PIC
-                ratings_home=row1[['Right attack', \
-                                   'Central attack',\
-                                   'Left attack',\
+                ratings_home=row1[[att_lab_r,\
+                                   att_lab_c,\
+                                   att_lab_l,\
                                    'scaled midfield',\
                                    'Right defence',\
                                    'Central defence',\
                                    'Left defence']].to_list()
-                ratings_home[3]=ratings_home[3]*0.859
+                ratings_home[3]=ratings_home[3]*pic_coeff#scale for PIC
             else:
                 ratings_home=row1[['Right attack', \
                                'Central attack',\
@@ -320,6 +351,7 @@ def ratings_array_rearrange(ratings_array,\
             #defenders:
             Z='Z'
             E='E'
+            #print(row1)
             num_defs1=row1['Defender_number']
             if num_defs1==2:
                 D=[E,Z,E,E,Z]
@@ -339,7 +371,7 @@ def ratings_array_rearrange(ratings_array,\
             elif num_mids==5:
                 M=[Z]*5 
             num_forwards=row1['Forward_number']
-            F=[Z]*num_forwards+[E]*(3-num_forwards)
+            F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
             #with no data on specs, pick a generic combo of specs
 
             specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
@@ -370,7 +402,7 @@ def ratings_array_rearrange(ratings_array,\
             elif num_mids==5:
                 M=[Z]*5  
             num_forwards=row2['Forward_number']
-            F=[Z]*num_forwards+[E]*(3-num_forwards)
+            F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
             #with no data on specs, pick a generic combo of specs
             if test_specs_array is None:
                 specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
@@ -380,7 +412,7 @@ def ratings_array_rearrange(ratings_array,\
             jj=0
             for ii,pl in enumerate(formation_list2):
                 if pl==Z:
-                    formation_list2[ii]=specs_list[jj]
+                    formation_list2[ii]=specs_list.iloc[jj]
                     jj=jj+1
             
             formation_home=formation_list1
@@ -410,11 +442,11 @@ def ratings_array_rearrange(ratings_array,\
             home_team=Team(*tuple(['Home City']+[ratings_home[3]]+\
                 ratings_home[4:7]+ratings_home[:3]+\
                 row1[['ISP defence','ISP attack','Tactic','Tactic skill']].tolist()+\
-                [num_defs1]))
+                [int(num_defs1)]))
             away_team=Team(*tuple(['Away Utd']+[ratings_away[3]]+\
                 ratings_away[4:7]+ratings_away[:3]+\
                 row2[['ISP defence','ISP attack','Tactic','Tactic skill']].tolist()+\
-                [num_defs2]))
+                [int(num_defs2)]))
 
             
             # Set up the match
@@ -433,7 +465,7 @@ def ratings_array_rearrange(ratings_array,\
             
 
             if abs(L-L2/100)>0.1:
-                
+                print('WARNING - big predictor discrepancy')
                 print(ratings_home)
                 print(metaratings_home)
                 print(ratings_away)
@@ -474,7 +506,7 @@ def ratings_array_rearrange(ratings_array,\
         wins_array2,draws_array2,losses_array2,\
         goals_historic_home,goals_historic_away,goals_predicted_home,goals_predicted_away
             
-def results_array_prune(filename='full_ra_withres.csv',filename1='test_individual.csv',filename2='test_ratings.csv',filename3='test_specs.csv'):
+def results_array_prune(filename='full_ra_withres.csv',filename1=str(nt_id)+'_test_individual.csv',filename2=str(nt_id)+'_test_ratings.csv',filename3=str(nt_id)+'_test_specs.csv'):
     P=pd.read_csv(filename,index_col=False)
     means=[]
     for col in P.columns:
@@ -512,7 +544,7 @@ def results_array_drop(name,filename='full_ra_withres.csv'):
     P.to_csv(filename,index=False)
 
 
-def results_array_drop_last(filename='full_ra_withres.csv',filename1='test_individual.csv',filename2='test_ratings.csv',filename3='test_specs.csv'):
+def results_array_drop_last(filename='full_ra_withres.csv',filename1=str(nt_id)+'_test_individual.csv',filename2=str(nt_id)+'_test_ratings.csv',filename3=str(nt_id)+'_test_specs.csv'):
     P=pd.read_csv(filename,index=False)
     P.drop([P.columns[-1]],axis=1)      
     P.to_csv(filename,index=False)
@@ -537,7 +569,7 @@ if __name__=='__main__':
                      )
 
 
-
+    print('test run W/D/L')
     print(W)
     print(D)
     print(L)
@@ -548,14 +580,31 @@ if __name__=='__main__':
     
     
     #import ratings array
-    ratings_array=array_clean(pd.read_csv(str(nt_id)+'_ratings_data.csv'))
-    ratings_array_eng=array_clean(pd.read_csv(str(nt_id_eng)+'_ratings_data.csv'))
+    #try:
+    #    ratings_array=array_clean(pd.read_csv(str(nt_id)+'_ratings_data.csv'))
+    #except ValueError:
+    ratings_array=pd.read_csv(str(nt_id)+'_ratings_data.csv')
+    ratings_array=ratings_array[ratings_array['Tactic short']!='WO'].reset_index()
+    if 'Unnamed: 0' in ratings_array.columns:
+        ratings_array=ratings_array.drop('Unnamed: 0',axis=1)
+    curr_campaign=max(ratings_array['campaign'])
     
+    #ratings_array_eng=array_clean(pd.read_csv(str(nt_id_eng)+'_ratings_data.csv'))
     
+    #calculate number of matches since season start
+    curr_season=max(ratings_array['campaign'])
     
+    #calculate in order to be able to isolate matches from current campaign only
+    matches_since_season_start=sum(ratings_array['campaign']==curr_season)
+
+    #calculate in order to be able to isolate matches from current campaign only
+    matches_since_previous_start=sum(ratings_array['campaign']==curr_season)+sum(ratings_array['campaign']==curr_season-2)
+
+    
+    """
     #To test a set of proposed NT ratings against a full history of matches
     try:
-        test_ratings=pd.read_csv('test_ratings.csv')#IMPORT FILE HERE!!!!
+        test_ratings=pd.read_csv('_test_ratings.csv')#IMPORT FILE HERE!!!!
     except FileNotFoundError:
         #if file does not exist, use template to create it
             
@@ -568,25 +617,26 @@ if __name__=='__main__':
         PTR['Team name'].loc[0]='dummy'        
         PTR['Tactic'].loc[0]='(no tactic)'
         
-        PTR.to_csv('test_ratings.csv')
-        test_ratings=pd.read_csv('test_ratings.csv')
+        PTR.to_csv('_test_ratings.csv')
+        test_ratings=pd.read_csv('_test_ratings.csv')
         #handle labels:
             
     for i in range(test_ratings.shape[0]):
         if test_ratings['Team name'].iloc[i] in test_ratings['Team name'].iloc[:i].values.tolist():
             test_ratings['Team name'].iloc[i]=test_ratings['Team name'].iloc[i]+'_'+str(i)
     try:
-        test_specs_array=pd.read_csv('test_specs.csv')
+        test_specs_array=pd.read_csv('_test_specs.csv')
     except FileNotFoundError:
-        pd.DataFrame(['Z']*10+['E']*3).transpose().to_csv('test_specs.csv')
-        test_specs_array=pd.read_csv('test_specs.csv')
-        
-     
-    test_individual_orders=pd.read_csv('test_individual.csv')
-     
-    test_ratings_labels=test_ratings['Team name'].tolist()
+        pd.DataFrame(['Z']*10+['E']*3).transpose().to_csv('_test_specs.csv')
+        test_specs_array=pd.read_csv('_test_specs.csv')
+    """     
     
-    #test_ratings.to_csv('test_ratings.csv')
+    test_ratings=pd.read_csv(str(nt_id)+'_test_ratings.csv')#ratings file  
+    test_individual_orders=pd.read_csv(str(nt_id)+'_test_individual.csv')#indiv orders - only for display
+    test_specs_array=pd.read_csv(str(nt_id)+'_test_specs.csv')#specs file
+    test_ratings_labels=test_ratings['Team name'].tolist()#labels for the proposed lineups
+    
+    #test_ratings.to_csv('_test_ratings.csv')
     
     
     
@@ -607,7 +657,7 @@ if __name__=='__main__':
         
         
     #examine
-    
+    debug_result_examine=0
     def result_examine(res,ratings_array,test_ratings_labels,\
                        averages_only=False,matches_since_season_start=matches_since_season_start):
         
@@ -617,9 +667,12 @@ if __name__=='__main__':
         
         res_=pd.DataFrame(res.transpose())
         res_.columns=test_ratings_labels
-        print(res_)
+        if debug_result_examine:
+            print(res_)
         #res_.columns=[]
         ratings_array_withresult=pd.concat([ratings_array,res_],axis=1)
+        if debug_result_examine:
+            print(ratings_array_withresult)
         #save relevant parts of ratings array
         ratings_array_tosave=ratings_array_withresult[['scaled midfield','Midfield','Right defence',\
         'Central defence', 'Left defence', 'Right attack', 'Central attack',\
@@ -628,7 +681,7 @@ if __name__=='__main__':
         
         ratings_array_tosave.to_csv('full_ra_withres.csv')
         
-        print(ratings_array_withresult)
+        
         ratings_array_show=ratings_array_withresult[['MT','Tactic','Opponent']+test_ratings_labels]
 
         #remove all friendly results
@@ -672,7 +725,7 @@ if __name__=='__main__':
         pc_avs=ratings_array_pc[test_ratings_labels].mean(axis=0)
         pr_avs=ratings_array_pr[test_ratings_labels].mean(axis=0)
         
-        
+        """
         print('average vs ca:')
         print(ca_avs)
         print('average vs normal')
@@ -686,19 +739,19 @@ if __name__=='__main__':
         if not np.isnan(ls_avs.iloc[0]):
             print('average vs longshots')
             print(ls_avs)
+        """
 
-
-        
+        """
         m=matches_since_season_start
         #print(test_ratings_labels)
         #RECENT AVERAGES
-        ca_avs=ratings_array_ca[test_ratings_labels].iloc[:m].mean(axis=0)
-        print('TEST')
-        print(ratings_array_ca[test_ratings_labels].iloc[:m])
-        norm_avs=ca_avs=ratings_array_no[test_ratings_labels].iloc[:m].mean(axis=0)
-        ls_avs=ratings_array_ls[test_ratings_labels].iloc[:m].mean(axis=0)
-        pc_avs=ratings_array_pc[test_ratings_labels].iloc[:m].mean(axis=0)
-        pr_avs=ratings_array_pr[test_ratings_labels].iloc[:m].mean(axis=0)
+        ca_avs=ratings_array_ca[test_ratings_labels].loc[:m].mean(axis=0)
+        print('_test')
+        print(ratings_array_ca[test_ratings_labels].loc[:m])
+        norm_avs=ca_avs=ratings_array_no[test_ratings_labels].loc[:m].mean(axis=0)
+        ls_avs=ratings_array_ls[test_ratings_labels].loc[:m].mean(axis=0)
+        pc_avs=ratings_array_pc[test_ratings_labels].loc[:m].mean(axis=0)
+        pr_avs=ratings_array_pr[test_ratings_labels].loc[:m].mean(axis=0)
         
         
         print('this campaign average vs ca:')
@@ -715,7 +768,8 @@ if __name__=='__main__':
             print(pc_avs)
         if not np.isnan(pr_avs.iloc[0]):
             print('this campaign average vs press')
-            print(pr_avs)  
+            print(pr_avs)
+        """
         return ratings_array_ca,ratings_array_no,ratings_array_ls,ratings_array_pc,ratings_array_pr
 
     #return ratings_array_ca  [test_ratings_label.columns].mean(axis=0) 
@@ -732,10 +786,11 @@ if __name__=='__main__':
         
         A=test_individual_orders.values
         for row in A:
+            #print(row)
             row_gk=str(row[0])
             row_def=''.join(row[1:6])
             row_mid=''.join(row[6:11])
-            row_att=''.join(row[11:16])
+            row_att=''.join(row[11:14])
             defence_indiv.append(row_def)
             midfield_indiv.append(row_mid)
             attack_indiv.append(row_att)
@@ -743,13 +798,13 @@ if __name__=='__main__':
         
         print('with pic - red')
         ratings_array_pic_ca,ratings_array_pic_no,ratings_array_pic_ls,ratings_array_pic_pc,ratings_array_pic_pr=\
-            result_examine(res_pic[2],ratings_array,test_ratings_labels)
+            result_examine(res_pic[WLD],ratings_array,test_ratings_labels)
         print('with pic - larry')
         #result_examine(res_pic[5],ratings_array,test_ratings_labels)    
         
         print('with pin - red')
         ratings_array_pin_ca,ratings_array_pin_no,ratings_array_pin_ls,ratings_array_pin_pc,ratings_array_pin_pr=\
-            result_examine(res_pin[2],ratings_array,test_ratings_labels)
+            result_examine(res_pin[WLD],ratings_array,test_ratings_labels)
         print('with pin - larry')
         #result_examine(res_pin[5],ratings_array,test_ratings_labels)
         
@@ -759,42 +814,56 @@ if __name__=='__main__':
         
         #AVERAGES PIC FULL
         ca_avs_pic=ratings_array_pic_ca[test_ratings_labels].mean(axis=0).round(4)
-        norm_avs_pic=ca_avs=ratings_array_pic_no[test_ratings_labels].mean(axis=0).round(4)
+        norm_avs_pic=ratings_array_pic_no[test_ratings_labels].mean(axis=0).round(4)
         ls_avs_pic=ratings_array_pic_ls[test_ratings_labels].mean(axis=0).round(4)
         pc_avs_pic=ratings_array_pic_pc[test_ratings_labels].mean(axis=0).round(4)
         pr_avs_pic=ratings_array_pic_pr[test_ratings_labels].mean(axis=0).round(4)
         
     
         m=matches_since_season_start
+        m2=matches_since_previous_start
         
         #AVERAGE PIC RECENT
-        ca_avs_pic_r=ratings_array_pic_ca[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        norm_avs_pic_r=ca_avs=ratings_array_pic_no[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        ls_avs_pic_r=ratings_array_pic_ls[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        pc_avs_pic_r=ratings_array_pic_pc[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        pr_avs_pic_r=ratings_array_pic_pr[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
+        ca_avs_pic_r=ratings_array_pic_ca[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        norm_avs_pic_r=ratings_array_pic_no[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        ls_avs_pic_r=ratings_array_pic_ls[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        pc_avs_pic_r=ratings_array_pic_pc[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        pr_avs_pic_r=ratings_array_pic_pr[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+
+        #AVERAGE PIC PREVIOUS
+        ca_avs_pic_r2=ratings_array_pic_ca[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        norm_avs_pic_r2=ratings_array_pic_no[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        ls_avs_pic_r2=ratings_array_pic_ls[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        pc_avs_pic_r2=ratings_array_pic_pc[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        pr_avs_pic_r2=ratings_array_pic_pr[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        
         
     
         #AVERAGES pin FULL
         ca_avs_pin=ratings_array_pin_ca[test_ratings_labels].mean(axis=0).round(4)
-        norm_avs_pin=ca_avs=ratings_array_pin_no[test_ratings_labels].mean(axis=0).round(4)
+        norm_avs_pin=ratings_array_pin_no[test_ratings_labels].mean(axis=0).round(4)
         ls_avs_pin=ratings_array_pic_ls[test_ratings_labels].mean(axis=0).round(4)
-        
         pc_avs_pin=ratings_array_pin_pc[test_ratings_labels].mean(axis=0).round(4)
         pr_avs_pin=ratings_array_pin_pr[test_ratings_labels].mean(axis=0).round(4)
         
-    
-        m=matches_since_season_start
-        
-        #AVERAGE pin RECENT
-        ca_avs_pin_r=ratings_array_pin_ca[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        norm_avs_pin_r=ca_avs=ratings_array_pin_no[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        ls_avs_pin_r=ratings_array_pin_ls[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
 
-        pc_avs_pin_r=ratings_array_pin_pc[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
-        pr_avs_pin_r=ratings_array_pin_pr[test_ratings_labels].iloc[:m].mean(axis=0).round(4)
+        #AVERAGE pin RECENT
+        ca_avs_pin_r=ratings_array_pin_ca[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        norm_avs_pin_r=ratings_array_pin_no[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        ls_avs_pin_r=ratings_array_pin_ls[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        pc_avs_pin_r=ratings_array_pin_pc[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+        pr_avs_pin_r=ratings_array_pin_pr[test_ratings_labels].loc[:m].mean(axis=0).round(4)
+
+        #AVERAGE pin RECENT
+        ca_avs_pin_r2=ratings_array_pin_ca[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        norm_avs_pin_r2=ratings_array_pin_no[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        ls_avs_pin_r2=ratings_array_pin_ls[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        pc_avs_pin_r2=ratings_array_pin_pc[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
+        pr_avs_pin_r2=ratings_array_pin_pr[test_ratings_labels].loc[:m2].mean(axis=0).round(4)
         
-        #Make a table
+
+        
+        
 
             
     
@@ -802,9 +871,9 @@ if __name__=='__main__':
             ranking=df.reindex(df[test_ratings_labels].mean(axis=0).sort_values(ascending=False).index, axis=1)
             if df.shape[0]==0:
                 continue   
-            print('PIC')
+            print(pic_flag)
             print(df['Tactic'].iloc[0])
-            print(ranking)  
+            print(ranking.set_index(df['Opponent']))  
         
             #now, plot the top several options
             coln=0
@@ -853,7 +922,7 @@ if __name__=='__main__':
         
         
         
-        
+        #Make a table
         
         
         from prettytable import PrettyTable
@@ -862,57 +931,194 @@ if __name__=='__main__':
         myTable.add_row(["","",""]+midfield_indiv)
         myTable.add_row(["","",""]+attack_indiv)
         if not np.isnan(norm_avs_pic.iloc[0]):
-            myTable.add_row(['N','PIC','84']+norm_avs_pic.values.tolist())                  
+            myTable.add_row(['N',pic_flag,'84']+norm_avs_pic.values.tolist())                  
         if not np.isnan(norm_avs_pic_r.iloc[0]):
-            myTable.add_row(['N','PIC','86']+norm_avs_pic_r.values.tolist())          
+            myTable.add_row(['N',pic_flag,str(curr_campaign-2)]+norm_avs_pic_r2.values.tolist())          
+        if not np.isnan(norm_avs_pic_r.iloc[0]):
+            myTable.add_row(['N',pic_flag,str(curr_campaign)]+norm_avs_pic_r.values.tolist())          
+        
+        
         if not np.isnan(norm_avs_pin.iloc[0]):
             myTable.add_row(['N','pin','84']+norm_avs_pin.values.tolist())                  
         if not np.isnan(norm_avs_pin_r.iloc[0]):
-            myTable.add_row(['N','pin','86']+norm_avs_pin_r.values.tolist()) 
+           myTable.add_row(['N','pin',str(curr_campaign-2)]+norm_avs_pin_r2.values.tolist()) 
+        if not np.isnan(norm_avs_pin_r.iloc[0]):
+            myTable.add_row(['N','pin',str(curr_campaign)]+norm_avs_pin_r.values.tolist()) 
     
         if not np.isnan(ca_avs_pic.iloc[0]):
-            myTable.add_row(['CA','PIC','84']+ca_avs_pic.values.tolist())
+            myTable.add_row(['CA',pic_flag,'84']+ca_avs_pic.values.tolist())
         if not np.isnan(ca_avs_pic_r.iloc[0]):
-            myTable.add_row(['CA','PIC','86']+ca_avs_pic_r.values.tolist())
+            myTable.add_row(['CA',pic_flag,str(curr_campaign-2)]+ca_avs_pic_r2.values.tolist())
+        if not np.isnan(ca_avs_pic_r.iloc[0]):
+            myTable.add_row(['CA',pic_flag,str(curr_campaign)]+ca_avs_pic_r.values.tolist())
+       
         if not np.isnan(ca_avs_pin.iloc[0]):
             myTable.add_row(['CA','pin','84']+ca_avs_pin.values.tolist())
         if not np.isnan(ca_avs_pin_r.iloc[0]):
-            myTable.add_row(['CA','pin','86']+ca_avs_pin_r.values.tolist())
+            myTable.add_row(['CA','pin',str(curr_campaign-2)]+ca_avs_pin_r2.values.tolist())
+        if not np.isnan(ca_avs_pin_r.iloc[0]):
+            myTable.add_row(['CA','pin',str(curr_campaign)]+ca_avs_pin_r.values.tolist())
+        
+        
         if not np.isnan(pr_avs_pic.iloc[0]):
-            
-            myTable.add_row(['Pr','PIC','84']+pr_avs_pic.values.tolist())    
+            myTable.add_row(['Pr',pic_flag,'84']+pr_avs_pic.values.tolist())    
+        if not np.isnan(pr_avs_pic_r2.iloc[0]):
+            myTable.add_row(['Pr',pic_flag,str(curr_campaign-2)]+pr_avs_pic_r2.values.tolist())    
         if not np.isnan(pr_avs_pic_r.iloc[0]):
-            myTable.add_row(['Pr','PIC','86']+pr_avs_pic_r.values.tolist())    
+            myTable.add_row(['Pr',pic_flag,str(curr_campaign)]+pr_avs_pic_r.values.tolist())    
+        
         if not np.isnan(pc_avs_pic.iloc[0]):
-            myTable.add_row(['PC','PIC','84']+pc_avs_pic.values.tolist())
+            myTable.add_row(['PC',pic_flag,'84']+pc_avs_pic.values.tolist())
+        if not np.isnan(pc_avs_pic_r2.iloc[0]):
+            myTable.add_row(['PC',pic_flag,str(curr_campaign-2)]+pc_avs_pic_r2.values.tolist())
         if not np.isnan(pc_avs_pic_r.iloc[0]):
-            myTable.add_row(['PC','PIC','86']+pc_avs_pic_r.values.tolist())
+            myTable.add_row(['PC',pic_flag,str(curr_campaign)]+pc_avs_pic_r.values.tolist())
+        
         if not np.isnan(ls_avs_pic.iloc[0]):
-            myTable.add_row(['ls','pic','84']+ls_avs_pic.values.tolist())
+            myTable.add_row(['ls',pic_flag,'84']+ls_avs_pic.values.tolist())
+        if not np.isnan(ls_avs_pic_r2.iloc[0]):
+            myTable.add_row(['ls',pic_flag,str(curr_campaign-2)]+ls_avs_pic_r2.values.tolist())  
         if not np.isnan(ls_avs_pic_r.iloc[0]):
-            myTable.add_row(['ls','pic','86']+ls_avs_pic_r.values.tolist())  
+            myTable.add_row(['ls',pic_flag,str(curr_campaign)]+ls_avs_pic_r.values.tolist())  
 
-    
         if not np.isnan(pr_avs_pin.iloc[0]):
             myTable.add_row(['Pr','pin','84']+pr_avs_pin.values.tolist())    
+        if not np.isnan(pr_avs_pin_r2.iloc[0]):
+            myTable.add_row(['Pr','pin',str(curr_campaign-2)]+pr_avs_pin_r2.values.tolist())    
         if not np.isnan(pr_avs_pin_r.iloc[0]):
-            myTable.add_row(['Pr','pin','86']+pr_avs_pin_r.values.tolist())    
+            myTable.add_row(['Pr','pin',str(curr_campaign)]+pr_avs_pin_r.values.tolist())    
+        
         if not np.isnan(pc_avs_pin.iloc[0]):
             myTable.add_row(['PC','pin','84']+pc_avs_pin.values.tolist())
+        if not np.isnan(pc_avs_pin_r2.iloc[0]):
+            myTable.add_row(['PC','pin',str(curr_campaign-2)]+pc_avs_pin_r2.values.tolist())
         if not np.isnan(pc_avs_pin_r.iloc[0]):
-            myTable.add_row(['PC','pin','86']+pc_avs_pin_r.values.tolist())
+            myTable.add_row(['PC','pin',str(curr_campaign)]+pc_avs_pin_r.values.tolist())
+        
         if not np.isnan(ls_avs_pin.iloc[0]):
             myTable.add_row(['ls','pin','84']+ls_avs_pin.values.tolist())
+        if not np.isnan(ls_avs_pin_r2.iloc[0]):
+            myTable.add_row(['ls','pin',str(curr_campaign-2)]+ls_avs_pin_r2.values.tolist())            
         if not np.isnan(ls_avs_pin_r.iloc[0]):
-            myTable.add_row(['ls','pin','86']+ls_avs_pin_r.values.tolist())            
+            myTable.add_row(['ls','pin',str(curr_campaign)]+ls_avs_pin_r.values.tolist())            
         print(myTable)    
+        
+        from PIL import Image, ImageDraw, ImageFont
+    
+        font = ImageFont.load_default()
+        im = Image.new("RGB", (160+90*len(A), 320), "white")
+        draw = ImageDraw.Draw(im)
+        #font = ImageFont.truetype("FreeMono.ttf", 15)
+        font = ImageFont.load_default()
+        draw.text((10, 10), str(myTable), font=font, fill="black")
+        
+        im.show()
+        im.save("table.png")
+                
+        
+        #now, do a ranking of results from worst to best, by row mean across the predictions
+        #in order to see how our lineups perform vs the most challenging opponent lineups
+        
+        #AVERAGES PIC FULL
+        ca_avs_pic=ratings_array_pic_ca.mean(axis=1,numeric_only=True).round(4)
+        #now, sort according to the mean
+        ratings_array_pic_ca['av_by_opponent']=ca_avs_pic
+        ratings_array_pic_ca.sort_values(by='av_by_opponent',inplace=True)
+
+        #calc worst 5 and worst 10?
+        
+
+
+        norm_avs_pic=ratings_array_pic_no.mean(axis=1,numeric_only=True).round(4)
+        #now, sort according to the mean
+        ratings_array_pic_no['av_by_opponent']=norm_avs_pic
+        ratings_array_pic_no.sort_values(by='av_by_opponent',inplace=True)
+
+
+        
+        norm_avs_pic=ratings_array_pic_no[test_ratings_labels].mean(axis=0).round(4)
+        ls_avs_pic=ratings_array_pic_ls[test_ratings_labels].mean(axis=1).round(4)
+        pc_avs_pic=ratings_array_pic_pc[test_ratings_labels].mean(axis=1).round(4)
+        pr_avs_pic=ratings_array_pic_pr[test_ratings_labels].mean(axis=1).round(4)
+        
+    
+        m=5
+        
+        #AVERAGE PIC RECENT
+        ca_avs_pic_last=ratings_array_pic_ca.loc[ratings_array_pic_ca.index<ratings_array_pic_ca.index.sort_values()[m]]
+        ls_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        pc_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        pr_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        no_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+ 
+         
+        #AVERAGE PIN RECENT
+        ca_avs_pin_last=ratings_array_pin_ca.loc[ratings_array_pin_ca.index<ratings_array_pin_ca.index.sort_values()[m]]
+        ls_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        pc_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        pr_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        no_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+         
+        
+        for df in ca_avs_pin_last,no_avs_pin_last:
+            ranking=df.reindex(df[test_ratings_labels].mean(axis=0).sort_values(ascending=False).index, axis=1)
+            if df.shape[0]==0:
+                continue   
+            print('PIN')
+            print(df['Tactic'].iloc[0])
+            print(ranking.set_index(df['Opponent']).transpose())  
+        
+            #now, plot the top several options
+            coln=0
+            for col in ranking:
+                if ranking.shape[1]<2:
+                    
+                    plt.plot(ranking[col],linewidth=0.5,marker='*',label=col)
+                else:
+                    plt.plot(ranking[col]-ranking[ranking.columns[0]],linewidth=0.5,marker = 'o',label=col)
+                plt.title('vs '+df['Tactic'].mode().iloc[0]+' pin recent, best='+ranking.columns[0])
+                plt.xticks(ticks=df['Opponent'].index, labels=df['Opponent'].values,\
+                           fontsize=7,rotation = 90)
+                coln=coln+1
+                if coln>plot_best:
+                    break
+            plt.legend()
+            plt.show()   
             
+        for df in ca_avs_pic_last,no_avs_pic_last:
+            ranking=df.reindex(df[test_ratings_labels].mean(axis=0).sort_values(ascending=False).index, axis=1)
+            if df.shape[0]==0:
+                continue   
+            print(pic_flag)
+            print(df['Tactic'].iloc[0])
+            print(ranking.set_index(df['Opponent']).transpose())  
+        
+            #now, plot the top several options
+            coln=0
+            for col in ranking:
+                if ranking.shape[1]<2:
+                    
+                    plt.plot(ranking[col],linewidth=0.5,marker='*',label=col)
+                else:
+                    plt.plot(ranking[col]-ranking[ranking.columns[0]],linewidth=0.5,marker = 'o',label=col)
+                plt.title('vs '+df['Tactic'].mode().iloc[0]+' pic recent, best='+ranking.columns[0])
+                plt.xticks(ticks=df['Opponent'].index, labels=df['Opponent'].values,\
+                           fontsize=7,rotation = 90)
+                coln=coln+1
+                if coln>plot_best:
+                    break
+            plt.legend()
+            plt.show()       
+                  
+
+  
+        
         
     results_present(res_pic,res_pin,ratings_array,test_ratings_labels,\
                         test_individual_orders,\
                         matches_since_season_start=matches_since_season_start\
                             ,plot_best=5)
-    results_array_prune(filename='full_ra_withres.csv',filename1='test_individual.csv',filename2='test_ratings.csv',filename3='test_specs.csv')
+    results_array_prune(filename='full_ra_withres.csv',filename1=str(nt_id)+'_test_individual.csv',filename2=str(nt_id)+'_test_ratings.csv',filename3=str(nt_id)+'_test_specs.csv')
 
     """
     print('with pic - red')
