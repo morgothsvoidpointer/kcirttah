@@ -23,11 +23,11 @@ from ht_ratings_export import nt_id
 np.set_printoptions(threshold=100000)
 pd.option_context('display_max_rows',None,'display_max_columns',100)
 pd.options.display.max_colwidth=100
-nt_id_eng=3035
+nt_id_eng=3144
 
 mots_not_pic=0#set 1 to return results for MOTS and PIN
 #set 0 to return results for PIC and PIN
-WLD=2
+WLD=0
 #2 to return win %'s
 #1 to return draw %'s
 #0 to return opposition win %'s
@@ -36,7 +36,7 @@ if mots_not_pic:
     pic_coeff=1.115
     pic_flag='MOTS'
 else:
-    pic_coeff=0.0859
+    pic_coeff=0.8394
     pic_flag='PIC'
 
 current_campaign_season_start=88
@@ -80,6 +80,17 @@ formation_away=[E,E,E,\
 H,Q,Pdim,Q,H,\
 Z,H,Z,Q,H]
 
+
+def specs_for_xlsx(spec):
+    if spec=='S':
+        return 'Z'
+    if spec=='R':
+        return 'Z'
+    if spec=='p':
+        return 'Pdim'
+    if spec=='W':
+        return 'Pnf'
+    return spec
     
 
 def wdl_nicarana(ratings_home,\
@@ -89,6 +100,9 @@ def wdl_nicarana(ratings_home,\
                  formation_home,\
                  formation_away,\
                  predict_with_spex=False):
+    
+    print('fh='+str(formation_home))
+    print('fa='+str(formation_away))
     
     if predict_with_spex:
 
@@ -137,10 +151,11 @@ def wdl_nicarana(ratings_home,\
     away_cells=['J17','K17','L17',\
                 'I18','J18','K18','L18','M18',\
                 'I19','J19','K19','L19','M19']
+    print(formation_home)
     for i in range(len(formation_home)):
-        excel.set_value('simulator!'+home_cells[i],formation_home[i])
+        excel.set_value('simulator!'+home_cells[i],specs_for_xlsx(formation_home[i]))
     for i in range(len(formation_away)):
-        excel.set_value('simulator!'+away_cells[i],formation_away[i])  
+        excel.set_value('simulator!'+away_cells[i],specs_for_xlsx(formation_away[i])) 
 
     if predict_with_spex==False:
         excel.set_value('simulator!J4','No')
@@ -337,7 +352,7 @@ def ratings_array_rearrange(ratings_array,\
                                'Left defence']].to_list()
                 
                 
-                
+            #print(row1)
                 
             metaratings_home=row1[['ISP defence',\
                                    'ISP attack']].to_list()+[12.5]+\
@@ -373,15 +388,15 @@ def ratings_array_rearrange(ratings_array,\
             num_forwards=row1['Forward_number']
             F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
             #with no data on specs, pick a generic combo of specs
-
-            specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
+            
+            #specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
 
             formation_list1=F+M+D#forwards first!
-            jj=0
-            for ii,pl in enumerate(formation_list1):
-                if pl==Z:
-                    formation_list1[ii]=specs_list[jj]
-                    jj=jj+1
+            spex_string=list(ratings_array['spex'].iloc[i])
+            spex_string.reverse()
+            formation_list1=spex_string[1:]
+            
+
             
             num_defs2=row2['Defender_number']
             if num_defs2==2:
@@ -406,15 +421,17 @@ def ratings_array_rearrange(ratings_array,\
             #with no data on specs, pick a generic combo of specs
             if test_specs_array is None:
                 specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
-            else:
-                specs_list=test_specs_array.loc[j]
-            formation_list2=F+M+D#forwards first!
-            jj=0
-            for ii,pl in enumerate(formation_list2):
-                if pl==Z:
-                    formation_list2[ii]=specs_list.iloc[jj]
-                    jj=jj+1
+                
             
+                formation_list2=F+M+D#forwards first!
+                jj=0
+                for ii,pl in enumerate(formation_list2):
+                    if pl==Z:
+                        formation_list2[ii]=specs_list.iloc[jj]
+                        jj=jj+1
+            else:
+                formation_list2=test_specs_array.loc[j].tolist()[1:]
+                formation_list2.reverse()
             formation_home=formation_list1
             formation_away=formation_list2
             #print(metaratings_home)
@@ -584,6 +601,7 @@ if __name__=='__main__':
     #    ratings_array=array_clean(pd.read_csv(str(nt_id)+'_ratings_data.csv'))
     #except ValueError:
     ratings_array=pd.read_csv(str(nt_id)+'_ratings_data.csv')
+    ratings_array['MT']=ratings_array['Match Type']
     ratings_array=ratings_array[ratings_array['Tactic short']!='WO'].reset_index()
     if 'Unnamed: 0' in ratings_array.columns:
         ratings_array=ratings_array.drop('Unnamed: 0',axis=1)
@@ -691,6 +709,7 @@ if __name__=='__main__':
         
         ratings_array_ca=ratings_array_compet[ratings_array_compet['Tactic']=='Counter-attacks']
         ratings_array_no=ratings_array_compet[(ratings_array_compet['Tactic']=='(no tactic)')\
+                        | (ratings_array_compet['Tactic']=='Normal')\
                         | (ratings_array_compet['Tactic']=='Attack in the Middle')\
                         | (ratings_array_compet['Tactic']=='Attack on wings')]
 
@@ -720,7 +739,7 @@ if __name__=='__main__':
 
         #AVERAGES
         ca_avs=ratings_array_ca[test_ratings_labels].mean(axis=0)
-        norm_avs=ca_avs=ratings_array_no[test_ratings_labels].mean(axis=0)  
+        norm_avs=ratings_array_no[test_ratings_labels].mean(axis=0)  
         ls_avs=ratings_array_ls[test_ratings_labels].mean(axis=0)
         pc_avs=ratings_array_pc[test_ratings_labels].mean(axis=0)
         pr_avs=ratings_array_pr[test_ratings_labels].mean(axis=0)
@@ -1043,20 +1062,20 @@ if __name__=='__main__':
         
     
         m=5
-        
+        print(ratings_array_pic_no)
         #AVERAGE PIC RECENT
         ca_avs_pic_last=ratings_array_pic_ca.loc[ratings_array_pic_ca.index<ratings_array_pic_ca.index.sort_values()[m]]
-        ls_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
-        pc_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
-        pr_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        #ls_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        #pc_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        #pr_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
         no_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
  
          
         #AVERAGE PIN RECENT
         ca_avs_pin_last=ratings_array_pin_ca.loc[ratings_array_pin_ca.index<ratings_array_pin_ca.index.sort_values()[m]]
-        ls_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
-        pc_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
-        pr_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        #ls_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        #pc_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        #pr_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
         no_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
          
         
