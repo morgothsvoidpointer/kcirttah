@@ -6,7 +6,7 @@ Created on Tue Nov  7 16:24:42 2023
 """
 
 import pycel
-import os
+import os 
 from pycel import ExcelCompiler
 import matplotlib.pyplot as plt
 from scipy.stats import poisson
@@ -15,7 +15,7 @@ import numpy as np
 import re
 
 from larry_ht_sim import Team,Match
- 
+
 #nt_id=3222
 
 from ht_ratings_export import nt_id
@@ -25,9 +25,11 @@ pd.option_context('display_max_rows',None,'display_max_columns',100)
 pd.options.display.max_colwidth=100
 nt_id_eng=3144
 
+display_limit=15
+
 mots_not_pic=0#set 1 to return results for MOTS and PIN
 #set 0 to return results for PIC and PIN
-WLD=0
+WLD=2
 #2 to return win %'s
 #1 to return draw %'s
 #0 to return opposition win %'s
@@ -39,7 +41,7 @@ else:
     pic_coeff=0.8394
     pic_flag='PIC'
 
-current_campaign_season_start=88
+current_campaign_season_start=90
 
 filename='htme_sim.xlsx'
 excel=ExcelCompiler(os.getcwd()+'/'+filename)
@@ -131,6 +133,8 @@ def wdl_nicarana(ratings_home,\
     tactics_convert['Pressing']='Pressing'
     tactics_convert['Attack on wings']='Attack On Wings'
     tactics_convert['Attack in the Middle']='Attack In Middle'
+    tactics_convert['Attack in the middle']='Attack In Middle'
+    tactics_convert['Attack in wings']='Attack On Wings'
     tactics_convert['WO']='WO'
     
     metaratings_home[4]=tactics_convert[metaratings_home[4]]
@@ -260,19 +264,14 @@ def ratings_array_rearrange(ratings_array,\
                             predict_with_spex=True,\
                             test_specs_array=None,\
                             scale=0,\
-                            historic_match_simulation=False):
+                            historic_match_simulation=False,\
+                            scale2=0,\
+                            limit=np.inf):
 
-   #if simulating historic matches, the '_test_ratings' is just the 'ratings_array'
-   #with the two blocks of columns interchanged. 
-    if historic_match_simulation:
-        for col in ratings_array.columns:
-            if col[-1]!='_' and col+'_' in ratings_array.columns:
-                test_ratings[col]=ratings_array[col+'_']
-    
-   
-   
-    num_their_results=ratings_array.shape[0]
-    num_our_proposals=test_ratings.shape[0]
+    pass
+    #%%
+    num_their_results=min(ratings_array.shape[0],limit)
+    num_our_proposals=min(test_ratings.shape[0],limit)
     wins_array=np.zeros((num_our_proposals,num_their_results))
     draws_array=np.zeros((num_our_proposals,num_their_results))
     losses_array=np.zeros((num_our_proposals,num_their_results))
@@ -281,23 +280,32 @@ def ratings_array_rearrange(ratings_array,\
     draws_array2=np.zeros((num_our_proposals,num_their_results))
     losses_array2=np.zeros((num_our_proposals,num_their_results))
     
-    
-    goals_historic_home=[]
-    goals_historic_away=[]
-    goals_predicted_home=[]
-    goals_predicted_away=[]
-    
+    test_ratings=test_ratings.reset_index(drop=True)
+    ratings_array=ratings_array.reset_index(drop=True)
+ 
 
     
     #excel-based predictor
+    jcow=0
+    
     for j in test_ratings.index:
+        if jcow>=limit:
+            continue
+        print(jcow)
+        print(j)
+        icow=0    
+        jcow=jcow+1
+    
         for i in ratings_array.index:
-            if historic_match_simulation:
-                if i!=j:
-                    continue
             
-            
-            #print(i,j)
+            if icow>=limit:
+     
+                continue
+            print(icow)
+            print(i)
+
+
+            icow=icow+1
             row1=ratings_array.loc[i]
             row2=test_ratings.loc[j]
             
@@ -309,7 +317,7 @@ def ratings_array_rearrange(ratings_array,\
                 att_lab_r='Right attack'
                 att_lab_c='Central attack'
                 att_lab_l='Left attack'
-            
+            #print(row1)
             if scale==1 and not np.isnan(row1['scaled midfield']):#scaled for pin
                 ratings_home=row1[[att_lab_r,\
                                    att_lab_c,\
@@ -342,94 +350,153 @@ def ratings_array_rearrange(ratings_array,\
             for z in range(len(ratings_home)):
                 ratings_home[z]=ratings_home[z]/0.985
             
-            
-            ratings_away=row2[['Right attack', \
-                               'Central attack',\
-                               'Left attack',\
-                               'Midfield',\
-                               'Right defence',\
-                               'Central defence',\
-                               'Left defence']].to_list()
-                
-                
-            #print(row1)
-                
             metaratings_home=row1[['ISP defence',\
                                    'ISP attack']].to_list()+[12.5]+\
                              row1[['Tactic skill',\
                                    'Tactic']].to_list()
-            metaratings_away=row2[['ISP defence',\
-                                   'ISP attack']].to_list()+[12.5]+\
-                             row2[['Tactic skill',\
-                                   'Tactic']].to_list()
-            #formation
-            #defenders:
-            Z='Z'
-            E='E'
-            #print(row1)
             num_defs1=row1['Defender_number']
-            if num_defs1==2:
-                D=[E,Z,E,E,Z]
-            elif num_defs1==3:
-                D=[Z,E,Z,E,Z]
-            elif num_defs1==4:
-                D=[Z,Z,E,Z,Z]
-            elif num_defs1==5:
-                D=[Z]*5
-            num_mids=row1['Mid_number']
-            if num_mids==2:
-                M=[Z,E,E,E,Z]
-            elif num_mids==3:
-                M=[Z,E,Z,E,Z]
-            elif num_mids==4:
-                M=[Z,Z,E,Z,Z]
-            elif num_mids==5:
-                M=[Z]*5 
-            num_forwards=row1['Forward_number']
-            F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
-            #with no data on specs, pick a generic combo of specs
-            
-            #specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
 
-            formation_list1=F+M+D#forwards first!
             spex_string=list(ratings_array['spex'].iloc[i])
             spex_string.reverse()
             formation_list1=spex_string[1:]
             
-
             
-            num_defs2=row2['Defender_number']
-            if num_defs2==2:
-                D=[E,Z,E,E,Z]
-            elif num_defs2==3:
-                D=[Z,E,Z,E,Z]
-            elif num_defs2==4:
-                D=[Z,Z,E,Z,Z]
-            elif num_defs2==5:
-                D=[Z]*5
-            num_mids=row2['Mid_number']
-            if num_mids==2:
-                M=[Z,E,E,E,Z]
-            elif num_mids==3:
-                M=[Z,E,Z,E,Z]
-            elif num_mids==4:
-                M=[Z,Z,E,Z,Z]
-            elif num_mids==5:
-                M=[Z]*5  
-            num_forwards=row2['Forward_number']
-            F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
-            #with no data on specs, pick a generic combo of specs
-            if test_specs_array is None:
-                specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
+            if historic_match_simulation:
+                if scale2==1 and not np.isnan(row2['scaled midfield']):#scaled for pin
+                    ratings_away=row1[[att_lab_r,\
+                                       att_lab_c,\
+                                       att_lab_l,\
+                                       'scaled midfield',\
+                                       'Right defence',\
+                                       'Central defence',\
+                                       'Left defence']].to_list()
+                elif scale2==2 and not np.isnan(row2['scaled midfield']):#scaled for PIC
+                    ratings_away=row1[[att_lab_r,\
+                                       att_lab_c,\
+                                       att_lab_l,\
+                                       'scaled midfield',\
+                                       'Right defence',\
+                                       'Central defence',\
+                                       'Left defence']].to_list()
+                    ratings_away[3]=ratings_away[3]*pic_coeff#scale for PIC
+                else:
+                    ratings_away=row1[['Right attack', \
+                                   'Central attack',\
+                                   'Left attack',\
+                                   'Midfield',\
+                                   'Right defence',\
+                                   'Central defence',\
+                                   'Left defence']].to_list()            
+                #scale for stamina drop to recreate ratings at 0 mins
                 
-            
-                formation_list2=F+M+D#forwards first!
-                jj=0
-                for ii,pl in enumerate(formation_list2):
-                    if pl==Z:
-                        formation_list2[ii]=specs_list.iloc[jj]
-                        jj=jj+1
+                
+                
+                for z in range(len(ratings_away)):
+                    ratings_away[z]=ratings_away[z]/0.985
+                
+                metaratings_away=row2[['ISP defence',\
+                                       'ISP attack']].to_list()+[12.5]+\
+                                 row2[['Tactic skill',\
+                                       'Tactic']].to_list()
+                num_defs2=row2['Defender_number']
+    
+                spex_string=list(ratings_array['spex'].iloc[i])
+                spex_string.reverse()
+                formation_list2=spex_string[1:]
+                            
+                
             else:
+                ratings_away=row2[['Right attack', \
+                                   'Central attack',\
+                                   'Left attack',\
+                                   'Midfield',\
+                                   'Right defence',\
+                                   'Central defence',\
+                                   'Left defence']].to_list()
+                    
+                    
+                #print(row1)
+                    
+
+                metaratings_away=row2[['ISP defence',\
+                                       'ISP attack']].to_list()+[12.5]+\
+                                 row2[['Tactic skill',\
+                                       'Tactic']].to_list()
+                
+     
+                
+                """
+                #formation
+                #defenders:
+                Z='Z'
+                E='E'
+                #print(row1)
+                           if num_defs1==2:
+                    D=[E,Z,E,E,Z]
+                elif num_defs1==3:
+                    D=[Z,E,Z,E,Z]
+                elif num_defs1==4:
+                    D=[Z,Z,E,Z,Z]
+                elif num_defs1==5:
+                    D=[Z]*5
+                num_mids=row1['Mid_number']
+                if num_mids==2:
+                    M=[Z,E,E,E,Z]
+                elif num_mids==3:
+                    M=[Z,E,Z,E,Z]
+                elif num_mids==4:
+                    M=[Z,Z,E,Z,Z]
+                elif num_mids==5:
+                    M=[Z]*5 
+                num_forwards=row1['Forward_number']
+                F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
+                #with no data on specs, pick a generic combo of specs
+                
+                #specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
+    
+                formation_list1=F+M+D#forwards first!
+                """
+                
+                
+    
+                
+                num_defs2=row2['Defender_number']
+                """
+                if num_defs2==2:
+                    D=[E,Z,E,E,Z]
+                elif num_defs2==3:
+                    D=[Z,E,Z,E,Z]
+                elif num_defs2==4:
+                    D=[Z,Z,E,Z,Z]
+                elif num_defs2==5:
+                    D=[Z]*5
+                num_mids=row2['Mid_number']
+                if num_mids==2:
+                    M=[Z,E,E,E,Z]
+                elif num_mids==3:
+                    M=[Z,E,Z,E,Z]
+                elif num_mids==4:
+                    M=[Z,Z,E,Z,Z]
+                elif num_mids==5:
+                    M=[Z]*5  
+                num_forwards=row2['Forward_number']
+                F=[Z]*int(num_forwards)+[E]*(3-int(num_forwards))
+                
+    
+                #with no data on specs, pick a generic combo of specs
+                if test_specs_array is None:
+                    specs_list=['Q','Q','Q','H','H','H','U','U','U','Q']
+                    
+                
+                    formation_list2=F+M+D#forwards first!
+                    jj=0
+                    for ii,pl in enumerate(formation_list2):
+                        if pl==Z:
+                            formation_list2[ii]=specs_list.iloc[jj]
+                            jj=jj+1
+                else:
+    
+                """
                 formation_list2=test_specs_array.loc[j].tolist()[1:]
                 formation_list2.reverse()
             formation_home=formation_list1
@@ -444,10 +511,22 @@ def ratings_array_rearrange(ratings_array,\
                              predict_with_spex\
                              )
             #print(metaratings_home)
-            wins_array[j,i]=W
-            draws_array[j,i]=D
-            losses_array[j,i]=L
-            
+            try:
+                
+                print('writing '+str((j,i)))
+                wins_array[j,i]=W
+                draws_array[j,i]=D
+                losses_array[j,i]=L
+            except ValueError:
+                print(ratings_home)
+                print(ratings_away)
+                print(metaratings_home)
+                print(metaratings_away)
+                print(formation_home)
+                print(formation_away)
+                draws_array[i,j]=0
+                
+                
             
             #Larry's
             """
@@ -479,7 +558,8 @@ def ratings_array_rearrange(ratings_array,\
             wins_array2[j,i]=W2/100
             draws_array2[j,i]=D2/100
             losses_array2[j,i]=L2/100
-            
+            print(L)
+            print(L2)
 
             if abs(L-L2/100)>0.1:
                 print('WARNING - big predictor discrepancy')
@@ -503,26 +583,13 @@ def ratings_array_rearrange(ratings_array,\
                 print(W-W2/100)                
                 print(W)
                 """         
-            #If we are simulating actual past matches, extract and compare goals with ht predictions
-            if historic_match_simulation and i==j:
-                goals_historic_home.append(row1['Average goals'])
-                goals_historic_away.append(row2['Average goals'])
-                goals_predicted_home.append(excel.evaluate('simulator!P15'))
-                goals_predicted_away.append(excel.evaluate('simulator!R15'))
-            
-                            
-            
-    if historic_match_simulation:
-        print('home goals real vs historic')
-        print(np.array(goals_historic_home)-np.array(goals_predicted_home))
-    if historic_match_simulation:
-        print('away goals real vs historic')
-        print(np.array(goals_historic_away)-np.array(goals_predicted_away)) 
-        
+
+    #%%        
+
     return wins_array,draws_array,losses_array,\
-        wins_array2,draws_array2,losses_array2,\
-        goals_historic_home,goals_historic_away,goals_predicted_home,goals_predicted_away
-            
+        wins_array2,draws_array2,losses_array2
+        
+        
 def results_array_prune(filename='full_ra_withres.csv',filename1=str(nt_id)+'_test_individual.csv',filename2=str(nt_id)+'_test_ratings.csv',filename3=str(nt_id)+'_test_specs.csv'):
     P=pd.read_csv(filename,index_col=False)
     means=[]
@@ -535,15 +602,19 @@ def results_array_prune(filename='full_ra_withres.csv',filename1=str(nt_id)+'_te
     todel=[]
     todel_ind=[]
     ma=0
-    if len(means_actual)>5:
+    if len(means_actual)>display_limit:
         for c,m in enumerate(means):
             if m is None:
                 continue
             else:
-                if m<np.mean(means_actual)-0.05:
+                if m<np.mean(means_actual)-0.05 and WLD==2:
                    todel.append(P.columns[c])
                    todel_ind.append(ma)
                    print(str(P.columns[c])+' removed')
+                if m>np.mean(means_actual)+0.05 and WLD==0:
+                   todel.append(P.columns[c])
+                   todel_ind.append(ma)
+                   print(str(P.columns[c])+' removed')                    
                 ma=ma+1
                 
         P.drop(todel,axis=1,inplace=True)
@@ -603,6 +674,10 @@ if __name__=='__main__':
     ratings_array=pd.read_csv(str(nt_id)+'_ratings_data.csv')
     ratings_array['MT']=ratings_array['Match Type']
     ratings_array=ratings_array[ratings_array['Tactic short']!='WO'].reset_index()
+    ratings_array=ratings_array[ratings_array[['Midfield','Central attack','Central defence','Left attack','Left defence','Right attack','Right defence']].sum(axis=1)>10].reset_index()
+
+    
+    
     if 'Unnamed: 0' in ratings_array.columns:
         ratings_array=ratings_array.drop('Unnamed: 0',axis=1)
     curr_campaign=max(ratings_array['campaign'])
@@ -704,16 +779,19 @@ if __name__=='__main__':
 
         #remove all friendly results
         ratings_array_compet=ratings_array_show[ratings_array_show['MT']!='F'] 
-        print(ratings_array_compet)
+        print(ratings_array_compet.columns)
+        print(test_ratings_labels)
         ratings_array_compet.columns=['MT','Tactic','Opponent']+test_ratings_labels
         
         ratings_array_ca=ratings_array_compet[ratings_array_compet['Tactic']=='Counter-attacks']
         ratings_array_no=ratings_array_compet[(ratings_array_compet['Tactic']=='(no tactic)')\
                         | (ratings_array_compet['Tactic']=='Normal')\
                         | (ratings_array_compet['Tactic']=='Attack in the Middle')\
-                        | (ratings_array_compet['Tactic']=='Attack on wings')]
+                        | (ratings_array_compet['Tactic']=='Attack on wings')\
+                        | (ratings_array_compet['Tactic']=='Attack in the middle')\
+                        | (ratings_array_compet['Tactic']=='Attack in wings')]
 
-        ratings_array_ls=ratings_array_compet[ratings_array_compet['Tactic']=='Long Shots']
+        ratings_array_ls=ratings_array_compet[ratings_array_compet['Tactic']=='Long shots']
         
         ratings_array_pr=ratings_array_compet[ratings_array_compet['Tactic']=='Pressing']
 
@@ -1023,14 +1101,14 @@ if __name__=='__main__':
         print(myTable)    
         
         from PIL import Image, ImageDraw, ImageFont
-    
+        
         font = ImageFont.load_default()
         im = Image.new("RGB", (160+90*len(A), 320), "white")
         draw = ImageDraw.Draw(im)
         #font = ImageFont.truetype("FreeMono.ttf", 15)
         font = ImageFont.load_default()
-        draw.text((10, 10), str(myTable), font=font, fill="black")
-        
+        draw.text((10, 10), str(myTable), font=font, fill=7,spacing=5)
+        #draw.text((10, 10), myTable, font=font, fill="black")        
         im.show()
         im.save("table.png")
                 
@@ -1065,7 +1143,8 @@ if __name__=='__main__':
         print(ratings_array_pic_no)
         #AVERAGE PIC RECENT
         ca_avs_pic_last=ratings_array_pic_ca.loc[ratings_array_pic_ca.index<ratings_array_pic_ca.index.sort_values()[m]]
-        #ls_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
+        if ratings_array_pic_ls.shape[0]>0:
+            ls_avs_pic_last=ratings_array_pic_ls.loc[ratings_array_pic_ls.index<ratings_array_pic_ls.index.sort_values()[m]]
         #pc_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
         #pr_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
         no_avs_pic_last=ratings_array_pic_no.loc[ratings_array_pic_no.index<ratings_array_pic_no.index.sort_values()[m]]
@@ -1073,13 +1152,19 @@ if __name__=='__main__':
          
         #AVERAGE PIN RECENT
         ca_avs_pin_last=ratings_array_pin_ca.loc[ratings_array_pin_ca.index<ratings_array_pin_ca.index.sort_values()[m]]
-        #ls_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
+        if ratings_array_pin_ls.shape[0]>0:
+            ls_avs_pin_last=ratings_array_pin_ls.loc[ratings_array_pin_ls.index<ratings_array_pin_ls.index.sort_values()[m]]
         #pc_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
         #pr_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
         no_avs_pin_last=ratings_array_pin_no.loc[ratings_array_pin_no.index<ratings_array_pin_no.index.sort_values()[m]]
          
-        
-        for df in ca_avs_pin_last,no_avs_pin_last:
+        if ratings_array_pin_ls.shape[0]==0:
+            arrays_pin=[ca_avs_pin_last,no_avs_pin_last]       
+        else:
+            arrays_pin=[ca_avs_pin_last,no_avs_pin_last,ls_avs_pin_last]
+
+
+        for df in arrays_pin:
             ranking=df.reindex(df[test_ratings_labels].mean(axis=0).sort_values(ascending=False).index, axis=1)
             if df.shape[0]==0:
                 continue   
@@ -1092,7 +1177,7 @@ if __name__=='__main__':
             for col in ranking:
                 if ranking.shape[1]<2:
                     
-                    plt.plot(ranking[col],linewidth=0.5,marker='*',label=col)
+                    plt.plot(ranking[col],linewidthres_=0.5,marker='*',label=col)
                 else:
                     plt.plot(ranking[col]-ranking[ranking.columns[0]],linewidth=0.5,marker = 'o',label=col)
                 plt.title('vs '+df['Tactic'].mode().iloc[0]+' pin recent, best='+ranking.columns[0])
@@ -1103,8 +1188,13 @@ if __name__=='__main__':
                     break
             plt.legend()
             plt.show()   
+
+        if ratings_array_pic_ls.shape[0]==0:
+            arrays_pic=[ca_avs_pic_last,no_avs_pic_last]  
+        else:
+            arrays_pic=[ca_avs_pic_last,no_avs_pic_last,ls_avs_pic_last]
             
-        for df in ca_avs_pic_last,no_avs_pic_last:
+        for df in arrays_pic:
             ranking=df.reindex(df[test_ratings_labels].mean(axis=0).sort_values(ascending=False).index, axis=1)
             if df.shape[0]==0:
                 continue   
@@ -1150,33 +1240,12 @@ if __name__=='__main__':
     print('with pin - larry')
     #result_examine(res_pin[5],ratings_array,test_ratings_labels,averages_only=True)                
     """    
-     
-    def historic_ratings_simulate():    
-        print('simulating historic matches for opposing NT')    
-        #To test the siulation of goals in the matches in the full history against the 
-        #expected goals in the HT matches
-        wins_array,draws_array,losses_array,\
-            wins_array2,draws_array2,losses_array2,\
-            goals_historic_home,goals_historic_away,\
-            goals_predicted_home,goals_predicted_away=\
-                ratings_array_rearrange(ratings_array,\
-                                test_ratings=pd.DataFrame(),\
-                                    predict_with_spex=True,\
-                                    test_specs=None,\
-                                        scale=0,\
-                                        historic_match_simulation=True)
-            
-            
-        ratings_array['Average_goals_predicted']=goals_predicted_home
-        ratings_array['Average_goals_predicted_']=goals_predicted_away
-        
-        print(ratings_array[['Tactic','Average_goals_predicted','Average goals']])
-        print(ratings_array[['Tactic_','Average_goals_predicted_','Average goals_']])                        
-        
-   
 
         
-
+    def their_intent_guess(nt_id_ours, nt_id_theirs):
+        #Importing our side's ratings, find which of the opponent's past lineups are best suited to handling us, on average
+        pass
+        
 
 
 

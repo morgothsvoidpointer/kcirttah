@@ -15,6 +15,7 @@ import matplotlib.dates as mdates
 from datetime import datetime,timedelta
 import re
 import time
+
 """
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -39,11 +40,24 @@ from bs4 import BeautifulSoup as bs
 
 from github_upload import github_upload
 from ehffutbol import ehffutbol_ts_tc,raw_text_output_process
+from ts_pernaug import ts_pernaug_import
 from hatrick_api import get_match_data_chpp,get_match_list
 
-nt_id=3249
-match_venue_forthem='A'
-import_from_remote=0
+nt_id=3113
+nt_id_mine=3031
+match_venue_forthem='N'
+
+
+
+ha_dict={}
+ha_dict['H']='A'
+ha_dict['A']='H'
+ha_dict['N']='N'
+
+match_venue_forus=ha_dict[match_venue_forthem]
+
+
+import_from_remote=1
 attitudes_override=1
 import_from_remote_ts=1
 
@@ -60,6 +74,14 @@ season_start_date84=datetime(2023,3,6)
 season_length=16*7
 
 player_drop_events={}
+if nt_id==3001:
+    player_drop_events[datetime.strptime("2024-10-19","%Y-%m-%d").date()]=-6.7
+    player_drop_events[datetime.strptime("2024-02-24","%Y-%m-%d").date()]=-2
+    player_drop_events[datetime.strptime("2024-03-02","%Y-%m-%d").date()]=-2
+    player_drop_events[datetime.strptime("2023-12-15","%Y-%m-%d").date()]=-3.5
+if nt_id==3012:
+    player_drop_events[datetime.strptime("2024-04-03","%Y-%m-%d").date()]=-2
+    player_drop_events[datetime.strptime("2024-10-16","%Y-%m-%d").date()]=-1
 if nt_id==3120:
     player_drop_events[datetime.strptime("2024-06-13","%Y-%m-%d").date()]=-1.08
 if nt_id==3307:
@@ -73,7 +95,14 @@ if nt_id==3102:
 if nt_id==3249:
     player_drop_events[datetime.strptime("2023-08-18","%Y-%m-%d").date()]=-5   
     player_drop_events[datetime.strptime("2023-10-05","%Y-%m-%d").date()]=-3   
-    
+if nt_id==3144:
+    player_drop_events[datetime.strptime("2024-04-02","%Y-%m-%d").date()]=-6
+    player_drop_events[datetime.strptime("2024-11-22","%Y-%m-%d").date()]=-4   
+if nt_id==3029:
+    player_drop_events[datetime.strptime("2024-03-10","%Y-%m-%d").date()]=-6   
+if nt_id==3027:
+    player_drop_events[datetime.strptime("2024-04-02","%Y-%m-%d").date()]=-1  
+
 
 
 #%%
@@ -135,7 +164,7 @@ def ts_evolution(match_datetimes,match_type,\
                  campaign_season_start,\
                  ts_array,season_start_date,\
                  player_drop_events={},\
-                 next_match_date=datetime.now(),debug_tsev=0):
+                 next_match_date=datetime.now(),debug_tsev=0,overall_ratings_pd=None):
 #%% 
     match_attitude=ts_array['att']
     ts_integer=ts_array['ts0']
@@ -194,7 +223,7 @@ def ts_evolution(match_datetimes,match_type,\
            #print('ts after update '+str(current_ts))
            #do resets
            if (curr_date-quali_reset).days%224==0 and 'W' in match_types_season.values:
-               current_ts=5
+               current_ts=5#wildcard
 
            elif (curr_date-wc_reset).days%224==0 and 'WC1' in match_types_season.values:
                current_ts=5
@@ -203,11 +232,24 @@ def ts_evolution(match_datetimes,match_type,\
            elif (curr_date-wc_reset).days%224==0 and 'NC' in match_types_season.values:
                current_ts=5
                #print('wc reset')
+           elif (curr_date-wc_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
+               current_ts=5
+           
+            
            elif (curr_date-wcr2_reset).days%224==0 and 'WC2' in match_types_season.values:
                current_ts=current_ts-0.8*(current_ts-5)
                #print('wc rest round 2')
+           elif (curr_date-wcr2_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
+               current_ts=current_ts-0.8*(current_ts-5)
+           
+            
            elif (curr_date-wcr3_reset).days%224==0 and 'WC3' in match_types_season.values:
                current_ts=current_ts-0.6*(current_ts-5)
+               print('wc r3 reset')
+           elif (curr_date-wcr3_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
+               current_ts=current_ts-0.6*(current_ts-5)
+               
+           
            elif (curr_date-wcr4_reset).days%224==0 and 'WC4' in match_types_season.values:
                current_ts=current_ts-0.4*(current_ts-5)
            elif (curr_date-wcr4_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
@@ -299,7 +341,8 @@ def ts_fit(match_dates,\
            match_type,\
            ts_array,\
            season_start_date,\
-           debug_tsev=0):
+           debug_tsev=0,
+           overall_ratings_pd=None):
     if debug_tsev==1:
         match_dates=overall_ratings_pd['Match Datetime']
         match_type=overall_ratings_pd['Match Type']
@@ -311,7 +354,7 @@ def ts_fit(match_dates,\
     ts_array_dates=pd.Series([d.date() for d in ts_array['Match Datetime'] if d.date()>cc_reset.date()])
 
     
-    ts_evol,ts_atmatch,ts_integer_match=ts_evolution(match_dates,match_type,ts_array,season_start_date,debug_tsev=0)
+    ts_evol,ts_atmatch,ts_integer_match=ts_evolution(match_dates,match_type,ts_array,season_start_date,debug_tsev=0,overall_ratings_pd=overall_ratings_pd)
         
     ts_diff=np.array(ts_atmatch)-np.array(ts_integer_match)
     
@@ -400,10 +443,26 @@ def ts_data_import(nt_id=3001):
     
     return data
 
+def ts_data_fill(ts_data):
+    time_range_days=(ts_data['datetime'].iloc[0]-ts_data['datetime'].iloc[-1]).days
+    new_rows=[]
+    for d in range(time_range_days):
+        dtime=ts_data['datetime'].iloc[-1]+timedelta(days=d)
+        if dtime not in ts_data['datetime'].tolist():
+            print(dtime)
+            new_rows.append([dtime,-1,-1])
+    new_rows_pd=pd.DataFrame(new_rows)
+    new_rows_pd.columns=ts_data.columns
+    ts_data=pd.concat([ts_data,new_rows_pd],axis=0)
+    ts_data.sort_values(by='datetime',inplace=True,ascending=False)
+    
+    return ts_data
+        
+
 def attitude_guess_ehff(ts_data,match_datetimes,player_drop_events={},current_ts=5):
     
     
-    
+    ts_data=ts_data_fill(ts_data)
     ts_data=ts_data.reset_index(drop=True)
 
     match_datetimes.sort_values(inplace=True,ignore_index=True)
@@ -769,12 +828,20 @@ def confidence_evolution(ts_data,match_datetimes,match_type,\
            elif (curr_date-wcr2_reset).days%224==0 and 'WC2' in match_types_season.values:
                current_cf=current_cf-0.8*(current_cf-5)
                #print('wc rest round 2')
+           elif (curr_date-wcr2_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
+               current_cf=current_cf-0.8*(current_cf-5) 
+               
            elif (curr_date-wcr3_reset).days%224==0 and 'WC3' in match_types_season.values:
                current_cf=current_cf-0.6*(current_cf-5)
+               print('wc3 reset')
+           elif (curr_date-wcr3_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
+               current_cf=current_cf-0.6*(current_cf-5)
+               
            elif (curr_date-wcr4_reset).days%224==0 and 'WC4' in match_types_season.values:
                current_cf=current_cf-0.4*(current_cf-5)
            elif (curr_date-wcr4_reset).days%224==0 and (datetime.now().date()-curr_date).days<7:
                current_cf=current_cf-0.4*(current_cf-5)  
+           
            elif (curr_date-cc_reset).days%224==0:
                current_cf=5
 
@@ -1176,31 +1243,34 @@ def season_idcol_create(match_datetimes,season_start_date84=datetime(2023,3,6)):
         
         
     #%%
-if __name__=='__main__':    
-    """
-    nt_match_id = 31515894
-    
-    team_A, team_B, match_data = get_nt_match_ratings(nt_match_id)
-    print('match data = '+str(match_data))
-    print('Team A = ', team_A)
-    print('Team B = ',  team_B)
-    """
-    
-    
 
-    seasons=[90,89,88,87,86,85,84]
+    
+def ht_ratings_export(nt_id,match_venue_forthem,\
+                      season_start_date84):        
+
+    
+    pass
+
+#%%
+    #seasons=[90,89,88,87,86,85,84]
+    seasons=[91,90,89,88,87,86]
+    season_start_date84=season_start_date84+timedelta(days=112)*(min(seasons)-84)
+    
     if import_from_remote==True:
                     
         try:
-            access_token
+            from access_code import access_token
+            from hattrick_auth import chpp_object_create
+            chpp=chpp_object_create(access_token)   
         except:
-            print('no object chpp active')
+            print('no object chpp  active')
             
             from hattrick_auth import ht_auth
 
             access_token=ht_auth()
-        from hattrick_auth import chpp_object_create
-        chpp=chpp_object_create(access_token)   
+            chpp=chpp_object_create(access_token)
+            with open('access_code.py','w') as f:
+                f.write('access_token='+str(access_token))
         try:
             #nt_match_ids=get_NT_match_IDs(nt_id, seasons)
             nt_match_ids=get_match_list(chpp,nt_id,seasons)
@@ -1226,6 +1296,8 @@ if __name__=='__main__':
         
         home_ratings=pd.DataFrame([a for a in team_a_list if a is not None])
         away_ratings=pd.DataFrame([b for b in team_b_list if b is not None])
+        away_ratings=away_ratings.reindex(home_ratings.columns,axis=1)
+        
         matches_pd=pd.DataFrame([m for m in match_list if m is not None])
         #home_ratings.to_csv('home_ratings_backup.csv',index=False)
         #away_ratings.to_csv('away_ratings_backup.csv',index=False)
@@ -1282,6 +1354,7 @@ if __name__=='__main__':
         overall_ratings_pd.columns=overall_ratings_pd.columns[:3]\
             .union(home_ratings.columns,sort=False).union(pd.Series(['HomeOrAway']),sort=False)\
             .union(pd.Series(home_ratings.columns).apply(add_),sort=False).union(pd.Series(['HomeOrAway_']),sort=False)
+        #overall_ratings_pd['Match Datetime']=[]
     
     if not import_from_remote:
         overall_ratings_pd=pd.read_csv(str(nt_id)+'_ratings_data.csv')
@@ -1294,8 +1367,10 @@ if __name__=='__main__':
             overall_ratings_pd['Match Datetime']=[datetime.strptime(d.split('+')[0],'%m/%d/%Y %H:%M') for d in overall_ratings_pd['Match Datetime']]
         except ValueError:
             overall_ratings_pd['Match Datetime']=[datetime.strptime(d.split('+')[0],'%Y-%m-%d %H:%M:%S') for d in overall_ratings_pd['Match Datetime']]
-            
-    
+        overall_ratings_pd=overall_ratings_pd[overall_ratings_pd['campaign']>=min(seasons)]    
+        
+        
+        
     #add abbreviations:
     opponents_short=[]
     type_short=[]
@@ -1304,8 +1379,8 @@ if __name__=='__main__':
     formation_=[]
     tactic_short=[]
     tactics_short_dict={'(no tactic)':'N','Normal':'N','Counter-attacks':'CA','Pressing':'Pr',\
-                        'Play creatively':'PC','Attack in the Middle':'AIM',\
-                            'Attack on wings':'AOW','Long shots':'LS','WO':'WO'}
+                        'Play creatively':'PC','Attack in the middle':'AIM','Attack in the Middle':'AIM',\
+                            'Attack on wings':'AOW','Attack in wings':'AOW','Long shots':'LS','WO':'WO'}
     
     for i in overall_ratings_pd.index:
         row=overall_ratings_pd.loc[i] 
@@ -1345,7 +1420,7 @@ if __name__=='__main__':
 
 
     
-    
+     
     for i in overall_ratings_pd.index:
         row=overall_ratings_pd.loc[i]             
         opponents_short.append(row['Team name_'][:3])
@@ -1379,7 +1454,7 @@ if __name__=='__main__':
             cc_game_counter=0
             wc_game_counter=0
             campaign_prev=campaign_curr
-        
+        print(row)
         if row['Competition']=='Africa Cup' or\
            row['Competition']=='Asia and Oceania Cup' or\
            row['Competition']=='America Cup' or\
@@ -1433,7 +1508,7 @@ if __name__=='__main__':
     
     overall_ratings_pd.to_csv(str(nt_id)+'_ratings_data.csv')
     
-    match_datetimes=pd.Series(overall_ratings_pd['Match Datetime'])
+
     
 
 
@@ -1442,11 +1517,28 @@ if __name__=='__main__':
     
     #ts_data=ts_data_import(nt_id)
     if import_from_remote_ts:
+
+        pernaug_list=[]
+        for sea in seasons:
+            pernaug_list_entry=ts_pernaug_import(nt_id,sea)
+            if pernaug_list_entry is not None:
+                pernaug_list.append(pernaug_list_entry)
+        pernaug_list.reverse()
+        ts_data_pernaug=pd.concat(pernaug_list,axis=0)
+        
+
+
         try:
             ts_data=ehffutbol_ts_tc(nt_id)
         except:
-            rtfile=str(nt_id)+'_ts_data.txt'
-            ts_data=raw_text_output_process(rtfile)
+            try:
+                rtfile=str(nt_id)+'_ts_data.txt'
+                ts_data_ehff=raw_text_output_process(rtfile)
+            except FileNotFoundError:
+                pass
+            
+                
+        ts_data=ts_data_pernaug
             
     else:
         try:
@@ -1461,6 +1553,13 @@ if __name__=='__main__':
                 
         except TypeError:
             pass
+    
+    #need to adjust the ratings to start at ts data start
+    min_ts_date=min(ts_data['datetime'])
+    overall_ratings_pd=overall_ratings_pd[pd.Series([pd.Timestamp(d.date()) for d in \
+                overall_ratings_pd['Match Datetime']])>=pd.Timestamp(min_ts_date.date())]
+    match_datetimes=pd.Series(overall_ratings_pd['Match Datetime'])    
+    
     #ts_array=attitude_guess(ts_data,match_datetimes)
     
     dupes=ts_data.duplicated('datetime',keep=False)
@@ -1481,6 +1580,8 @@ if __name__=='__main__':
 
     ts_array=attitude_guess_ehff(ts_data,match_datetimes,player_drop_events)
     
+
+            
     
     #now scale by home or away
     
@@ -1570,7 +1671,9 @@ if __name__=='__main__':
             attitudes.loc[attitudes.shape[0]-20]=4/3
             attitudes.loc[attitudes.shape[0]-21]=4/3
             attitudes.loc[attitudes.shape[0]-34]=4/3    
-            
+        if nt_id==3001:
+            attitudes.loc[attitudes.shape[0]-27]=1
+            attitudes.loc[attitudes.shape[0]-21]=1             
         if nt_id==3186:
             attitudes.loc[attitudes.shape[0]-5]=4/3
             attitudes.loc[attitudes.shape[0]-10]=4/3
@@ -1581,7 +1684,8 @@ if __name__=='__main__':
             attitudes.loc[attitudes.shape[0]-5]=4/3
             attitudes.loc[attitudes.shape[0]-7]=4/3
             attitudes.loc[attitudes.shape[0]-25]=1
-            
+        if nt_id==3012:
+            attitudes.loc[attitudes.shape[0]-28]=1            
         if nt_id==3023:
             attitudes.loc[attitudes.shape[0]-7]=4/3
             #attitudes.loc[attitudes.shape[0]-40]=1/2            
@@ -1609,6 +1713,8 @@ if __name__=='__main__':
             attitudes.loc[attitudes.shape[0]-7]=4/3
         if nt_id==3025:
             attitudes.loc[attitudes.shape[0]-7]=4/3
+        if nt_id==3027:
+            attitudes.loc[attitudes.shape[0]-28]=1
         if nt_id==3035:
             attitudes.loc[attitudes.shape[0]-7]=4/3            
             attitudes.loc[attitudes.shape[0]-29]=4/3    
@@ -1696,9 +1802,11 @@ if __name__=='__main__':
         else:
             midr_with_han=midr_withts
         if att<0.75:
-            midr_with_attitude=midr_with_han/1.13
+            #midr_with_attitude=midr_with_han/1.13
+            midr_with_attitude=midr_with_han/1.115
         elif att>1.2:
-            midr_with_attitude=midr_with_han/0.87
+            #midr_with_attitude=midr_with_han/0.87
+            midr_with_attitude=midr_with_han/0.8395
         else: 
             midr_with_attitude=midr_with_han
         S.append(midr_with_attitude)
@@ -1738,21 +1846,26 @@ if __name__=='__main__':
     
     for cname in ['sc_la','sc_ca','sc_ra']:
         overall_ratings_pd.insert(4, cname, overall_ratings_pd.pop(cname))
-
+        
+        
+        
+    #prune decimals
+    for col in ['scaled midfield','sc_la','sc_ca','sc_ra']:
+        overall_ratings_pd[col]=overall_ratings_pd[col].round(4)
 
     #SAVE AND UPLOAD   
     
     
+    
+    
     overall_ratings_pd.to_csv(str(nt_id)+'_ratings_data.csv')
     
-    
-    github_upload(str(nt_id)+'_ratings_data.csv')
-    
+    try:  
+        github_upload(str(nt_id)+'_ratings_data.csv')
+    except:
+        print('not connected to github maybe')
 
-
-        #pd.DataFrame([w]).to_csv('sillydir/'+str(w)+'.csv')
-        #github_upload('sillydir/'+str(w)+'.csv',repo='test-')
-    
+   
     
     
     """
@@ -1777,8 +1890,21 @@ if __name__=='__main__':
     murderous	63%	72%	81%
     """
     
-    #%% PREDICTOR
+    
+    
+    
     
 
+if __name__=='__main__':    
 
-
+    ht_ratings_export(nt_id, match_venue_forthem, season_start_date84)
+    
+    from ht_compare_history import quick_dirty_compare
+    
+    ht_ratings_export(nt_id_mine, match_venue_forus, season_start_date84)
+    
+    quick_dirty_compare(nt_id,nt_id_mine,limit=10)
+    
+    
+    
+    
