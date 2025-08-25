@@ -43,6 +43,9 @@ from ehffutbol import ehffutbol_ts_tc,raw_text_output_process
 from ts_pernaug import ts_pernaug_import
 from hatrick_api import get_match_data_chpp,get_match_list
 
+from ht_finer_categorisation import finer_categorisation_tactics
+from orders_spex import osx_array
+
 nt_id=3113
 nt_id_mine=3031
 match_venue_forthem='N'
@@ -1859,6 +1862,9 @@ def ht_ratings_export(nt_id,match_venue_forthem,\
     
     
     overall_ratings_pd.to_csv(str(nt_id)+'_ratings_data.csv')
+    finer_categorisation_tactics(nt_id)
+    osx_array(nt_id)
+    
     
     try:  
         github_upload(str(nt_id)+'_ratings_data.csv')
@@ -1890,20 +1896,20 @@ def ht_ratings_export(nt_id,match_venue_forthem,\
     murderous	63%	72%	81%
     """
     
-    
+    return overall_ratings_pd
     
     
     
 
 if __name__=='__main__':    
 
-    ht_ratings_export(nt_id, match_venue_forthem, season_start_date84)
+    overall_ratings_pd=ht_ratings_export(nt_id, match_venue_forthem, season_start_date84)
     
-    from ht_compare_history import quick_dirty_compare
+    from ht_compare_history import quick_tactics_compare
     
-    ht_ratings_export(nt_id_mine, match_venue_forus, season_start_date84)
+    overall_ratings_pd_mine=ht_ratings_export(nt_id_mine, match_venue_forus, season_start_date84)
     
-    quick_dirty_compare(nt_id,nt_id_mine,limit=10)
+    #quick_tactics_compare(nt_id,nt_id_mine,limit=10)
     
     
     
