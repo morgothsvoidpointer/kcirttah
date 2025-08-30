@@ -18,6 +18,10 @@ This document will explain the main thinking behind the code.
 
 The data is imported through my CHPP credentials via the API. (Incidentally, my product on the CHPP is marked as 'declined' but I still have access). The package used is TODO by user TODO
 
+The import is handled by the file ht_ratings_export.py. Running the function ht_ratings_export in this file creates ratings array outputs for the opposition (nt_id) and our team (nt_id_mine). They are saved as files:
+
+<nt_id>_ratings.csv and <nt_id_mine>_ratings.csv
+
 ## Match IDs
 
 First of all, match IDs are imported for all seasons go back to February 2023. (It is possible, but not convenient, to change this start date). For each match, the match type is imported:
@@ -84,5 +88,43 @@ There are two issues with TS:
 * Sometimes, we estimate match attitude wrong. This is alos hand-corrected.
 
 A plot is generated showing how closely evaluated and actual TS figures match on days of competitive matches. This allows for hand correction.
+
+## Scaling
+
+Now that we have estimated fractional figures for TS and TC for every match day, we can scale the midfield and attack ratings accordingly:
+
+* Extract current TS for today
+* Use our value of TS on matchday we've constructed
+* Scale the match ratings to be as if the match were played with the current TS
+* Repeat the same for TC
+
+## The output array
+
+The output array - saved in file (nt id)_ratings.csv - has a large number of columns. It is uploaded to the repository. It can be examined visually or it can be kept to be used by other routines. 
+
+The columns fall into 3 groups:
+
+* Match-related columns - generally can be ignored, except for:
+   * The match date (Match Date)
+   * The Competition type (Competition)
+   * The campaign id (campaign). Given as the first season of the campaign - e.g. the 92-93 campaign comes up as 92 
+* Opposition-related columns. These are the statistics of the teams played by the team we are trying to examine. They are not used in any way and are of general interest with a sole exception of their number of goals (Actual goals_) used for updating confidence.
+* Columns related to the team in question, whose ID is part of the file name.
+   * Scaled midfield - midfield scaled by TS - at minute 0 (scaled_midfield)
+   * Scaled attack - attack scaled by TC - at minute 0 (sc_ra/sc_ca/sc_la)
+   * Defence ratings at minute 0 (Right defence/Central defence/Left defence)
+   * IDFK (SP) ratings at minute 0 (ISP attack/ISP defence)
+   * Formation at minute 0 (Formation)
+   * Total Experience (Total exp)
+   * Home/Away/Neutral/Derby (HomeOrAway)
+   * Attitude - PIC/PIN/MOTS - not included at the moment but should be
+   * Slider setting (style of play)
+   * Indiv orders at minute 0 (Indiv Order)
+   * Specs of starting lineup (spex)
+   * Tactic played and rating (Tactic, Tactic skill)
+   * Goals scored by team (Actual goals)
+   * Our own special tactical classification. More on this later. (T_C)
+
+
 
 
