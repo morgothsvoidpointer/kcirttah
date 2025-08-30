@@ -60,7 +60,29 @@ Sometimes, the values are inaccurate. Duke's values were particularly bad for th
 
 If something goes wrong, the values will have to be imported manually. This involves cutting and pasting data manually from ehffutbol for each month over 3 years into a text file, which my code then parses in. Not too onerous, but very annoying.
 
+# TS/TC evolution from the values
 
+The main problem with those imported values is that they are not fractional. (Actually, Pernaug does calculate fractional values, but the others do not, and if we want to keep the code useable with integer values of TS we cannot rely on this). 
 
+So, we have to mimic evolution of TS ourselves. Fortunately, the parameters are (almost) all known:
+
+* The formula for daily updates (at 3AM HT time)
+* The gains/losses of TS related to PIC/MOTS
+* The resets
+* The gains/losses of TC dependent on results
+
+The code:
+
+* Imports the TS/TC values
+* Uses them to estimate the match attitude (PIC/PIN/MOTS)
+* Uses that to reconstruct the evolution of team spirit
+* The TC values can be evaluated exactly, as all parameters are known.
+
+There are two issues with TS:
+
+* We do not know the TS hits from dropping players. Usually, those are input manually by me in the code.
+* Sometimes, we estimate match attitude wrong. This is alos hand-corrected.
+
+A plot is generated showing how closely evaluated and actual TS figures match on days of competitive matches. This allows for hand correction.
 
 
