@@ -282,6 +282,10 @@ As a sanity check, we can track the mean and standard deviation as we increase t
 
 Both 'rolling' - i.e. over a sliding window - mean and 'mean from a point till now' can be tracked.
 
+## Summary
+
+For every pair of attitudes from the set (PIC, PIN), we have defined, for any two NTs, matrices S where the rows correspond to the tactic type of team A ('the opposition') and the columns to the tactic of team B ('us'). The entries are some statistic representing the chances of one of the teams winning whilst playing that tactic-type, based on past historical data. 
+
 ## Implementation
 
 There is code implementing all of the above in the file ht_compare_history.py. The routine:
@@ -293,7 +297,21 @@ There is code implementing all of the above in the file ht_compare_history.py. T
 
 # Game theory
 
-  
+Now, we have a situation in which there are 2 players - A and B - and each has some number of strategies - represented by our tactic-types. Any of the matrices S can be viewed as a payoff matrix for one of the players playing the following game:
+
+* A picks a strategy A' whilst seeing S
+* B picks a strategy B' whilst seeing S without knowing what A picked
+* The game consists of reading the entry S(A',B') and flipping a biased coin with probability of win equal to S(A',B').
+
+Let us see an example of S:
+
+
+B (us) might begin by picking the strategy that gives the highest win chance over all the columns. But A will know we will pick this strategy. A might adjust their choice accordingly. We know A will do that. So we will adjust ours accordingly.
+
+The limit of this process (I know that you know that I know that you know...) is the Nash Equilibrium of a game. It is
+
+
+
 
 # Group prediction
 
