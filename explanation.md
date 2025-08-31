@@ -125,6 +125,21 @@ The columns fall into 3 groups:
    * Goals scored by team (Actual goals)
    * Our own special tactical classification. More on this later. (T_C)
 
+# Testing match predictions against scaled historic ratings
+
+On the Hattrick match orders page there are two buttons. One copies the ratings to the clipboard and the other copies the lineup. I have implemented a clipboard listener clipboard_listener.py that, if running, will parse those into a table. (The code is a bit temperamental). 
+
+Once the table of 'candidate lineups' is created, it is run through the predictor. Each candidate lineup is compared to the scaled historic ratings for each pair of attitudes (PIC or PIN) for the two teams.
+
+Then we can group those results by tactic and use them to educate our choice of tactics.
+
+I have used this for the last 2 years, however it is clear that the approach has serious shortcomings. 
+
+* We have no way to 'reverse' the analysis and put ourselves in the opponent's shoes - how do we determine the optimal choices for them?
+* The grouping is too crude and the statistics produced are not useful. We end up manually working with the numbers from the last few matches as a better predictor of what to expect in the game.
+
+The following is an attempt to ameliorate these shortcomings.
+
 # Analysis of historical results
 
 Now that we have the past N performnances of two teams, nothing stops us from going ahead and putting them all pairwise into the prediction to calculate the W/L/D probabilities. We ignore friendlies and only consider competition games.
@@ -277,6 +292,10 @@ There is code implementing all of the above in the file ht_compare_history.py. T
 * Produce plots of time dependence of mean and sd
 
 # Game theory
+
   
+
+# Group prediction
+
 
 
