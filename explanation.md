@@ -201,6 +201,7 @@ This combines two different approaches - 541 press and 352 defensive. It may nee
 ### PC
 
 * Any PC that is not 343, att or AoA.
+* This is to cover the 'Spanish-style' PC which is basically balanced+PC, but also the 'defensive 451 PC'
 
 ### LS
 
@@ -224,13 +225,58 @@ Let us consider just the PIC vs PIC case for simplicity. Others work in the same
 
 To establish notation, for team A playing tactic-type A' and team B playing tactic-type B', we have a matrix W(A',B') indicating the win chances of team B and a matrix L(A',B') indicating the win chances of team A. 
 
-## Statistics
+ ## Statistics
 
 For each W(A',B') we can look at various statistics:
 
-* The row, column and overall mean. 
+* The mean of W(A',B').
+* The standard deviation of W(A',B')
+* Max and min, giving the range of W(A'B')
+* Number of standard deviations of max away from mean
 
+There are other things we could do, e.g. excluding obviously 'outlier' rows and columns. The basic principle however is to answer the following questions:
 
+* How reliable is whatever statistic we pick at representing the matrix W(A',B')?
+* How reliable is it at representing the probability of the outcome were one team to play A' and the other B', based on the data?
+* Can we use this statistic to find the optimal choice of tactic A' for them and of tactic B' for us?
 
+(A statistic here can be defined as any function f(W) mapping W(A',B') to a real value).
+
+Any statistic involving the mean will dependend on standard deviation being 'tight', i.e. small. As we have seen in previous attempts to group past games, if you are expecting a CA and your win probability varies from 70% vs 532 to 40% vs 442 (this is a totally hypothetical example), that's not really useful to anyone at picking a tactic. 
+
+We can first look at tightness of the range, max-min. If the range is 0.05, we are laughing - a 5% error in our mean is nothing to be upset about. If your opponent picks up 3 good IMs in form, he could very easily make that 5%, and that's just life. Typically, the range will be in the 10-12% bracket. This is because even if the starting lineups may be similar, the ratings are affected by the entire game - including inconvenient things such as subs, formation changes and red cards. (Note: check if my ratings are 0' or average!). They are of course also affected by form. A match in which your opponent played 352, had 2 players sent off and had poor form is not representative of the true strength of their 352 tomorrow. 
+
+If we want to exclude outliers, the standard deviation is a better measure of tightness. The trouble with it is that it is usually very small across the board - 3-4%. But we can also see it as a positive and congratulate ourselves on finding consistent categories of match tactics! It really depends on whether you are a half full or half empty sort of person.
+
+Tightness indicates how much we trust any statistic including the mean at being representative. So, if our mean win chance is based on W(bal,bal) for balanced vs balanced (essentially, 352 vs 352) is 40%, will that be representative of what the win chance will actually be in the game? 
+
+I see 3 possible statistics to use, considering the standard deviation is 'tight' and especially if the range is 'tight':
+
+* The mean. This is the standard choice.
+* The mean plus the standard deviation. The choice if you are expecting opponents to raise their game for some reason - e.g. pick more players.
+* The max provided it is not too many standard deviaitons away from the mean - if you want to be extra pessimistic about your chances.
+
+## Recency
+
+Another constant problem is - how recent a result needs to be to be relevant. This is an issue because on one hand we don't want to consider games from 2 years ago, but on the other some tactic-types will be so rarely played that you won't have enough data to construct a statistic. I settled on the following criteria, which are subject to revision:
+
+* Last 50 competitive matches to be considered
+* For each tactic-type, last 10 competitive matches considered
+
+As a sanity check, we can track the mean and standard deviation as we increase the number of matches we consider and plot those quantities against time. If there is a big 'jerk' in the plots, it could mean something happened to the team that would make their results before a certain point in time irrelevant.
+
+Both 'rolling' - i.e. over a sliding window - mean and 'mean from a point till now' can be tracked.
+
+## Implementation
+
+There is code implementing all of the above in the file ht_compare_history.py. The routine:
+
+* Evaluates pairwise predictions. That usually takes a while.
+* For each pair of attitudes (PIC-PIC, PIC-PIN, PIN-PIC), evaluates the matrices W and L for each pair of tactics and save them to Markdown with format win_<nt_id_mine>_vs_<nt_id>.csv and loss_<nt_id_mine>_vs_<nt_id>.csv
+* Evaluate the matrices of means, sds, maxes and mins and save them to the file stats_<nt_id_mine>_vs_<nt_id>.csv
+* Produce plots of time dependence of mean and sd
+
+# Game theory
+  
 
 
