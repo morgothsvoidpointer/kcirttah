@@ -1,4 +1,5 @@
 3001, PIN, rows, loss, means
+
 3038, PIN, cols, win, means
 
 |        |        343 |      442ca |        AoA |        AoD |        att |        bal |     hardca |
@@ -12,6 +13,7 @@
 | hardca |   0.281982 |   0.297591 |   0.287755 |   0.26074  |   0.295051 |   0.281546 |   0.277366 |
 
 3001, PIN, rows, loss, means-1sd
+
 3038, PIN, cols, win, means-1sd
 
 |        |        343 |      442ca |        AoA |        AoD |        att |        bal |     hardca |
